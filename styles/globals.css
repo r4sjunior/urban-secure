@@ -1,0 +1,622 @@
+/* ══════════════════════════════════════════════════════════════
+   Urban Secure — Global Styles
+   Paleta Rasta: Vermelho · Amarelo · Verde
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Variáveis Rasta ── */
+:root {
+  --rasta-red:     #D32F2F;
+  --rasta-red-lt:  #FF5252;
+  --rasta-yellow:  #F9A825;
+  --rasta-yellow-lt: #FFD740;
+  --rasta-green:   #2E7D32;
+  --rasta-green-lt:#69F0AE;
+
+  --bg-base:    #0d0d0d;
+  --bg-panel:   #141414;
+  --bg-card:    #1c1c1c;
+  --bg-field:   #222;
+  --border:     #2e2e2e;
+  --text-main:  #f0f0f0;
+  --text-muted: #888;
+
+  /* Gradiente Rasta — usado no header e acentos */
+  --grad-rasta: linear-gradient(90deg, var(--rasta-red) 0%, var(--rasta-yellow) 50%, var(--rasta-green) 100%);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #__next {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-main);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Header com faixa Rasta */
+.app-header {
+  flex-shrink: 0;
+  padding: 0 16px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  position: relative;
+  padding-top: max(0px, env(safe-area-inset-top));
+}
+
+/* Linha rasta embaixo do header */
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--grad-rasta);
+}
+
+/* ── Mapa ── */
+.map-container {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+}
+
+/* ── Painel ── */
+.form-panel {
+  flex-shrink: 0;
+  height: 52dvh;
+  overflow-y: auto;
+  overflow-x: visible; /* não cria stacking context horizontal */
+  background: var(--bg-panel);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 2px solid var(--border);
+  /*
+   * isolation: isolate criaria um stacking context separado e
+   * impediria o modal da wallet (portal/fixed) de aparecer acima.
+   * Mantemos isolation: auto (padrão) para não bloquear o modal.
+   */
+  isolation: auto;
+}
+
+/* ── GPS status ── */
+.gps-status {
+  font-size: 12px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.gps-status.buscando { background: #1a1400; color: var(--rasta-yellow-lt); border: 1px solid var(--rasta-yellow); }
+.gps-status.ok       { background: #001a07; color: var(--rasta-green-lt);  border: 1px solid var(--rasta-green);  }
+.gps-status.erro     { background: #1a0000; color: var(--rasta-red-lt);    border: 1px solid var(--rasta-red);    }
+
+/* ── Wallet ── */
+.wallet-adapter-button {
+  width: 100% !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  background: #1a0033 !important;
+  border: 1px solid #6200ea !important;
+  font-size: 14px !important;
+  padding: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  /* Touch target mínimo de 44px (Apple HIG / Google Material) */
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(98,0,234,0.2);
+  position: relative;
+  z-index: 10; /* garante que o botão fica acima de outros elementos do painel */
+}
+.wallet-adapter-button:hover {
+  background: #2a0050 !important;
+}
+
+/* ── Modal da Wallet — z-index acima de TUDO (overlay, mapa, header) ── */
+/* O WalletModalProvider renderiza como portal mas precisa de z-index alto */
+.wallet-adapter-modal-wrapper {
+  z-index: 999999 !important;
+}
+.wallet-adapter-modal-overlay {
+  z-index: 999998 !important;
+}
+/* Garante que o modal não fica preso em stacking context do form-panel */
+.wallet-adapter-modal {
+  z-index: 999999 !important;
+  position: fixed !important;
+}
+/* Touch no mobile — aumenta área de clique dos itens da lista */
+.wallet-adapter-modal-list li {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  min-height: 48px !important;
+}
+.wallet-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.wallet-hint a { color: #9c6dfa; text-decoration: none; }
+
+/* ── Campos ── */
+.field {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-field);
+  color: var(--text-main);
+  font-size: 14px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field:focus { border-color: var(--rasta-green); }
+.field::placeholder { color: #444; }
+.field:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Upload ── */
+.file-label {
+  display: block;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px dashed #444;
+  background: var(--bg-card);
+  color: #aaa;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.file-label:active { border-color: var(--rasta-green); color: #fff; }
+
+.preview {
+  width: 100%;
+  max-height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+}
+
+/* ── Botão Mint ── */
+.mint-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  cursor: not-allowed;
+  background: #222;
+  color: #555;
+  transition: background 0.2s, transform 0.1s;
+}
+.mint-btn.active {
+  background: var(--grad-rasta);
+  color: #000;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(105,240,174,0.25);
+}
+.mint-btn.active:active { transform: scale(0.97); }
+.mint-btn.success {
+  background: #001a07;
+  color: var(--rasta-green-lt);
+  border: 1px solid var(--rasta-green);
+  cursor: pointer;
+}
+.mint-btn.minting {
+  background: #0a0a1a;
+  color: #9c6dfa;
+  cursor: wait;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.65} }
+
+/* ── Barra de progresso compacta (dentro do painel) ── */
+.mint-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #0a0a0a;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.mint-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.3;
+  transition: opacity 0.3s;
+}
+.mint-progress-step.done   { opacity: 0.6; }
+.mint-progress-step.active { opacity: 1; }
+.mint-progress-icon { font-size: 15px; width: 22px; text-align: center; flex-shrink: 0; }
+.mint-progress-label { font-size: 12px; color: #ccc; }
+.mint-progress-step.active .mint-progress-label { color: #fff; font-weight: 600; }
+.mint-progress-step.active .mint-progress-icon  { animation: spin 1s linear infinite; }
+
+/* ── Erro inline ── */
+.mint-error {
+  background: #1a0000;
+  border: 1px solid var(--rasta-red);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #ef9a9a;
+  line-height: 1.4;
+}
+
+/* ── Resultado do mint ── */
+.mint-result {
+  background: #001a07;
+  border: 1px solid var(--rasta-green);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mint-result p { font-size: 13px; }
+.mint-address  { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+.mint-links    { display: flex; gap: 12px; }
+.mint-links a  { font-size: 12px; color: var(--rasta-green-lt); text-decoration: none; }
+
+/* ── Network badge ── */
+.network-badge {
+  font-size: 10px;
+  color: #333;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MINT OVERLAY (full-screen)
+   ══════════════════════════════════════════════════════════════ */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.overlay-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  padding: 28px 24px;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Faixa rasta no topo do card */
+.overlay-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: var(--grad-rasta);
+}
+
+.overlay-title {
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--text-main);
+  letter-spacing: 0.3px;
+}
+
+/* Steps */
+.overlay-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.overlay-step-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-connector {
+  width: 2px;
+  height: 14px;
+  background: var(--border);
+  margin-left: 19px;
+  transition: background 0.4s;
+}
+.overlay-connector.done { background: var(--rasta-green); }
+
+.overlay-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  transition: background 0.3s;
+  opacity: 0.35;
+}
+.overlay-step.done   { opacity: 0.7; }
+.overlay-step.active { opacity: 1; background: rgba(46,125,50,0.12); }
+
+.overlay-step-icon {
+  font-size: 22px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  flex-shrink: 0;
+  transition: border-color 0.3s;
+}
+.overlay-step.active .overlay-step-icon { border-color: var(--rasta-green); }
+.overlay-step.done   .overlay-step-icon { border-color: var(--rasta-green); }
+.overlay-step-icon.spinning { animation: spin 1s linear infinite; }
+
+.overlay-step-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overlay-step-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.overlay-step-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.overlay-step-status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: transparent;
+  min-width: 28px;
+  text-align: right;
+}
+.overlay-step-status.done   { color: var(--rasta-green-lt); }
+.overlay-step-status.active { color: var(--rasta-yellow-lt); }
+
+/* Spinner global */
+.overlay-spinner-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+.overlay-spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color:    var(--rasta-green);
+  border-right-color:  var(--rasta-yellow);
+  border-bottom-color: var(--rasta-red);
+  animation: spin 0.9s linear infinite;
+}
+
+/* Mensagens */
+.overlay-success-msg {
+  text-align: center;
+  font-size: 13px;
+  color: var(--rasta-green-lt);
+  line-height: 1.5;
+}
+.overlay-error-msg {
+  text-align: center;
+  font-size: 13px;
+  color: #ef9a9a;
+  line-height: 1.5;
+  background: rgba(211,47,47,0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* Botão de ação do overlay */
+.overlay-btn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  background: var(--grad-rasta);
+  color: #000;
+  letter-spacing: 0.5px;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.overlay-btn:active { transform: scale(0.97); }
+
+/* ══════════════════════════════════════════════════════════════
+   MARCADORES DO MAPA — Ícones de Arte Urbana (Rasta)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Marcador genérico de arte urbana */
+.art-marker {
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+/* Tag de graffiti — fundo circular com borda Rasta */
+.art-marker-inner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50% 50% 50% 4px;   /* gota invertida = pin */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+  transform: rotate(-45deg);          /* rotaciona o pin */
+  border: 2.5px solid rgba(255,255,255,0.3);
+}
+
+/* Ícone interno não rotaciona */
+.art-marker-inner span {
+  transform: rotate(45deg);
+}
+
+/* Efeito de brilho Rasta no hover */
+.art-marker:hover .art-marker-inner {
+  box-shadow: 0 0 0 4px rgba(105,240,174,0.3), 0 3px 10px rgba(0,0,0,0.5);
+}
+
+/* ── Desktop layout ── */
+@media (min-width: 768px) {
+  .app { flex-direction: row; }
+  .app-header { display: none; }
+  .map-container { flex: 1; height: 100dvh; }
+  .form-panel { width: 340px; height: 100dvh; flex-shrink: 0; padding-top: 20px; }
+}
+
+/* ── Utilitários ── */
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.65} }
+
+/* ── Wallet: badge de conectado + bloco de dica ── */
+.wallet-connected-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #001a07;
+  border: 1px solid var(--rasta-green);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rasta-green-lt);
+}
+.wallet-pubkey {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.wallet-hint-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wallet-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.wallet-hint a {
+  color: #9c6dfa;
+  text-decoration: none;
+}
+.wallet-hint strong {
+  color: #ccc;
+}
+
+/* ── WalletHandler — Mobile Deep Links ── */
+.wallet-mobile-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wallet-mobile-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.wallet-deeplink-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.1s;
+  touch-action: manipulation;
+  min-height: 48px;
+}
+.wallet-deeplink-btn:active { transform: scale(0.97); }
+.wallet-deeplink-btn.phantom  { background: #4e44ce; color: #fff; }
+.wallet-deeplink-btn.solflare { background: #fc7227; color: #fff; }
+
+/* ── Skeletons — placeholders durante carregamento dinâmico ── */
+.map-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+  background-size: 400% 400%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.wallet-btn-skeleton {
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1a0033 25%, #2a0050 50%, #1a0033 75%);
+  background-size: 400% 400%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+/* ── Wallet adapter: isola os estilos para não vazar no mapa ──
+   O mapa usa classes Leaflet (.leaflet-*). A wallet usa (.wallet-adapter-*).
+   Sem isolamento, o CSS do adapter pode resetar posicionamento do mapa.  */
+.wallet-adapter-dropdown,
+.wallet-adapter-dropdown-list,
+.wallet-adapter-modal,
+.wallet-adapter-modal-wrapper {
+  /* Garante que o stacking context desses elementos
+     não interfere com o canvas do Leaflet */
+  isolation: isolate;
+}
