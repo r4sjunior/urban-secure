@@ -1,28 +1,19 @@
 /**
  * context/ArtsContext.jsx
- *
- * Estado global das artes urbanas com:
- *  - Cache em sessionStorage (carregamento instantâneo no refresh)
- *  - Busca em background da blockchain Solana
- *  - Merge inteligente: cache + novos dados on-chain
- *  - addArt() para atualizar o mapa imediatamente após o mint
+ * Estado global das artes com sessionStorage cache e busca em background.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { fetchAllUrbanArts } from '../lib/fetchArts';
 
-const CACHE_TTL_MS  = 5 * 60 * 1000; // 5 minutos
-const CACHE_KEY     = (net) => `urban-secure:arts:${net}`;
-
-// ── Cache helpers ─────────────────────────────────────────────
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_KEY    = (net) => `urban-secure:arts:${net}`;
 
 function readCache(network) {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY(network));
     if (!raw) return null;
     const { ts, arts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL_MS) return null; // expirado
+    if (Date.now() - ts > CACHE_TTL_MS) return null;
     return arts;
   } catch { return null; }
 }
@@ -30,73 +21,80 @@ function readCache(network) {
 function writeCache(network, arts) {
   try {
     sessionStorage.setItem(CACHE_KEY(network), JSON.stringify({ ts: Date.now(), arts }));
-  } catch { /* quota exceeded — ignora */ }
+  } catch { /* quota */ }
 }
 
 function mergeArts(existing, incoming) {
   const map = new Map(existing.map(a => [a.id, a]));
-  incoming.forEach(a => map.set(a.id, a)); // incoming sobrescreve
+  incoming.forEach(a => map.set(a.id, a));
   return Array.from(map.values());
 }
-
-// ── Context ───────────────────────────────────────────────────
 
 const ArtsContext = createContext(null);
 
 export function ArtsProvider({ children }) {
-  const wallet  = useWallet();
-  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+  const network     = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+  const [arts,      setArts]      = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const fetchingRef = useRef(false);
 
-  const [arts,          setArts]          = useState([]);
-  const [isLoading,     setIsLoading]     = useState(false);
-  const [lastFetchedAt, setLastFetchedAt] = useState(null);
-  const fetchingRef = useRef(false); // evita fetches paralelos
-
-  // ── Carrega cache imediatamente ao montar ─────────────────
+  // Carrega cache imediatamente
   useEffect(() => {
     const cached = readCache(network);
     if (cached?.length) {
+      console.log(`[ArtsContext] cache: ${cached.length} artes`);
       setArts(cached);
-      console.log(`[ArtsContext] Cache carregado: ${cached.length} artes`);
     }
-  }, [network]);
+    // Busca sempre ao montar (em background)
+    fetchFromChain();
+  }, []);
 
-  // ── Busca da blockchain em background ────────────────────
   const fetchFromChain = useCallback(async () => {
-    if (fetchingRef.current)  return; // já buscando
-
+    if (fetchingRef.current) return;
     fetchingRef.current = true;
     setIsLoading(true);
 
     try {
-      console.log('[ArtsContext] Buscando artes na Solana…');
-      // Helius não precisa de wallet — busca global de todos os NFTs URBAN
-      const chainArts = await fetchAllUrbanArts();
+      console.log('[ArtsContext] buscando /api/arts…');
+      const res = await fetch('/api/arts');
+
+      if (!res.ok) {
+        console.error('[ArtsContext] /api/arts retornou', res.status);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!data.arts) {
+        console.error('[ArtsContext] resposta sem campo arts:', data);
+        return;
+      }
+
+      if (data.arts.length === 0) {
+        console.log('[ArtsContext] nenhuma arte encontrada no Helius');
+        return;
+      }
+
+      console.log(`[ArtsContext] ${data.arts.length} artes recebidas da chain`);
 
       setArts(prev => {
-        const merged = mergeArts(prev, chainArts);
+        const merged = mergeArts(prev, data.arts);
         writeCache(network, merged);
-        console.log(`[ArtsContext] ${chainArts.length} artes da chain. Total: ${merged.length}`);
+        console.log(`[ArtsContext] total no mapa: ${merged.length}`);
         return merged;
       });
 
-      setLastFetchedAt(Date.now());
     } catch (err) {
-      console.error('[ArtsContext] Fetch error:', err);
+      console.error('[ArtsContext] erro ao buscar artes no Helius:', err.message);
     } finally {
       setIsLoading(false);
       fetchingRef.current = false;
     }
-  }, [wallet.publicKey, network]);
+  }, [network]);
 
-  // Busca artes ao montar — independente de wallet conectado
-  useEffect(() => {
-    fetchFromChain();
-  }, []);
-
-  // ── addArt: chamado logo após o mint ─────────────────────
-  // Atualiza o mapa em tempo real sem esperar nova busca na chain
+  // addArt: atualiza mapa imediatamente após mint
   const addArt = useCallback((art) => {
+    console.log('[ArtsContext] nova arte adicionada:', art.id);
     setArts(prev => {
       const merged = mergeArts(prev, [art]);
       writeCache(network, merged);
@@ -105,7 +103,7 @@ export function ArtsProvider({ children }) {
   }, [network]);
 
   return (
-    <ArtsContext.Provider value={{ arts, isLoading, lastFetchedAt, addArt, refetch: fetchFromChain }}>
+    <ArtsContext.Provider value={{ arts, isLoading, addArt, refetch: fetchFromChain }}>
       {children}
     </ArtsContext.Provider>
   );

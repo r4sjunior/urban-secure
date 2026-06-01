@@ -1,19 +1,24 @@
 /**
  * pages/api/arts.js
- *
- * Endpoint servidor para buscar todas as artes.
- * HELIUS_API_KEY fica no servidor — nunca exposta no browser.
+ * Busca global de NFTs URBAN via Helius DAS API.
+ * HELIUS_API_KEY fica apenas no servidor.
  */
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
+  // Aceita GET e POST
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const apiKey  = process.env.HELIUS_API_KEY;
   const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 
+  console.log('[/api/arts] iniciando busca');
+  console.log('[/api/arts] network:', network);
+  console.log('[/api/arts] apiKey presente:', !!apiKey);
+
   if (!apiKey) {
+    console.error('[/api/arts] HELIUS_API_KEY não configurada');
     return res.status(500).json({ error: 'HELIUS_API_KEY não configurada.' });
   }
 
@@ -25,7 +30,9 @@ export default async function handler(req, res) {
     let assets = [];
 
     while (true) {
-      const res2 = await fetch(url, {
+      console.log(`[/api/arts] buscando página ${page}…`);
+
+      const heliusRes = await fetch(url, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,42 +48,53 @@ export default async function handler(req, res) {
         }),
       });
 
-      if (!res2.ok) break;
-      const data  = await res2.json();
+      if (!heliusRes.ok) {
+        const errText = await heliusRes.text();
+        console.error('[/api/arts] Helius error:', heliusRes.status, errText);
+        break;
+      }
+
+      const data  = await heliusRes.json();
       const items = data?.result?.items ?? [];
+
+      console.log(`[/api/arts] página ${page}: ${items.length} itens`);
       assets = [...assets, ...items];
+
       if (items.length < 1000) break;
       page++;
     }
 
-    // Filtra e formata — retorna apenas campos públicos necessários
-    // Nunca expõe dados internos do Helius ou chaves
+    console.log(`[/api/arts] total assets URBAN: ${assets.length}`);
+
+    // Filtra e formata — só campos públicos necessários
     const arts = assets
       .map(asset => {
         const attrs = asset?.content?.metadata?.attributes ?? [];
         const lat   = parseFloat(attrs.find(a => a.trait_type === 'Latitude')?.value);
         const lng   = parseFloat(attrs.find(a => a.trait_type === 'Longitude')?.value);
+
         if (isNaN(lat) || isNaN(lng)) return null;
 
         return {
           id:           asset.id,
-          name:         asset?.content?.metadata?.name ?? 'Urban Art',
+          name:         asset?.content?.metadata?.name        ?? 'Urban Art',
           description:  asset?.content?.metadata?.description ?? '',
-          lat, lng,
-          imageUrl:     asset?.content?.links?.image ?? '',
-          artistWallet: asset?.ownership?.owner ?? '',
+          lat,
+          lng,
+          imageUrl:     asset?.content?.links?.image          ?? '',
+          artistWallet: asset?.ownership?.owner               ?? '',
           timestamp:    Date.now(),
         };
       })
       .filter(Boolean);
 
-    // Cache de 60s no Vercel Edge
+    console.log(`[/api/arts] artes com GPS válido: ${arts.length}`);
+
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-    return res.status(200).json({ arts });
+    return res.status(200).json({ arts, total: arts.length });
 
   } catch (err) {
-    console.error('[/api/arts]', err.message);
-    // Nunca expõe detalhes internos do erro para o cliente
+    console.error('[/api/arts] erro interno:', err.message);
     return res.status(500).json({ error: 'Erro ao buscar artes.' });
   }
 }
