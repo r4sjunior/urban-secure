@@ -127,8 +127,8 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
           }).addTo(m);
         }
 
-        // Centraliza só na primeira leitura precisa
-        if (firstFix.current && acc <= 100) {
+        // Centraliza na primeira leitura — qualquer precisão
+        if (firstFix.current) {
           m.setView([lat, lng], 17);
           firstFix.current = false;
         }
@@ -156,7 +156,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     watchRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 30000,
+      timeout: 15000,
     });
   }
 

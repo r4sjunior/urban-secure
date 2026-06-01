@@ -197,9 +197,9 @@ export default function Home() {
 
     if (!wallet.connected || !wallet.publicKey)
       return setMintError('Conecte sua carteira primeiro.');
-    const gpsOk = gps && !gps.error && (gps.acc <= 50 || gps.fonte === 'Manual');
+    const gpsOk = gps && !gps.error && gps.lat && gps.lng;
     if (!gpsOk)
-      return setMintError('Aguarde o GPS calibrar ou toque no mapa para definir a posição.');
+      return setMintError('Aguardando GPS. Vá para área aberta.');
     if (!nome.trim() || !descricao.trim())
       return setMintError('Preencha nome e descrição.');
     if (!imageFile)
@@ -247,17 +247,16 @@ export default function Home() {
     }
   };
 
-  const gpsOk   = gps && !gps.error && (gps.acc <= 50 || gps.fonte === 'Manual');
+  const gpsOk   = gps && !gps.error && gps.lat && gps.lng; // aceita qualquer precisão GPS
   const canMint = wallet.connected && gpsOk && nome.trim() && descricao.trim() && imageFile && !isMinting;
   const isBusy  = ['upload-image', 'upload-meta', 'minting'].includes(mintStep);
 
-  const gpsClass = !gps ? 'buscando' : gps.error ? 'erro' : gpsOk ? 'ok' : 'buscando';
+  const gpsClass = !gps ? 'buscando' : gps.error ? 'erro' : 'ok';
   const gpsLabel = !gps
-    ? '📡 Aguardando GPS… ou toque no mapa'
-    : gps.error ? `❌ ${gps.error}`
-    : gps.fonte === 'Manual' ? '📌 Posição manual definida ✅'
-    : gps.acc <= 50 ? `✅ GPS pronto — ±${gps.acc}m (${gps.fonte || 'GPS'})`
-    : `🟡 Calibrando — ±${gps.acc}m, aguarde…`;
+    ? '📡 Buscando GPS…'
+    : gps.error
+    ? `❌ ${gps.error}`
+    : `✅ GPS — ±${gps.acc}m`;
 
   function mintBtnLabel() {
     if (mintStep === 'success') return '✅ NFT Mintado! Registrar outra →';
