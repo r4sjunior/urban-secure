@@ -71,7 +71,7 @@ export function ArtsProvider({ children }) {
     try {
       console.log('[ArtsContext] Buscando artes na Solana…');
       // Helius não precisa de wallet — busca global de todos os NFTs URBAN
-      const chainArts = await fetchAllUrbanArts(null, network);
+      const chainArts = await fetchAllUrbanArts();
 
       setArts(prev => {
         const merged = mergeArts(prev, chainArts);
