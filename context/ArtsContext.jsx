@@ -63,7 +63,6 @@ export function ArtsProvider({ children }) {
 
   // ── Busca da blockchain em background ────────────────────
   const fetchFromChain = useCallback(async () => {
-    if (!wallet.publicKey)    return;
     if (fetchingRef.current)  return; // já buscando
 
     fetchingRef.current = true;
@@ -71,7 +70,8 @@ export function ArtsProvider({ children }) {
 
     try {
       console.log('[ArtsContext] Buscando artes na Solana…');
-      const chainArts = await fetchAllUrbanArts(wallet, network);
+      // Helius não precisa de wallet — busca global de todos os NFTs URBAN
+      const chainArts = await fetchAllUrbanArts(null, network);
 
       setArts(prev => {
         const merged = mergeArts(prev, chainArts);
@@ -89,10 +89,10 @@ export function ArtsProvider({ children }) {
     }
   }, [wallet.publicKey, network]);
 
-  // Dispara fetch quando wallet conecta
+  // Busca artes ao montar — independente de wallet conectado
   useEffect(() => {
-    if (wallet.publicKey) fetchFromChain();
-  }, [wallet.publicKey]);
+    fetchFromChain();
+  }, []);
 
   // ── addArt: chamado logo após o mint ─────────────────────
   // Atualiza o mapa em tempo real sem esperar nova busca na chain

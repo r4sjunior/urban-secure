@@ -83,14 +83,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
       attribution: '© OpenStreetMap',
     }).addTo(map);
 
-    // Toque/clique = posição manual arrastável
-    map.on('click', (e) => {
-      if (!activeRef.current) return;
-      const { lat, lng } = e.latlng;
-      colocarMarcadorUsuario(L, map, iconeUsuario, lat, lng, true);
-      setModo('manual');
-      onLocationUpdate({ lat, lng, acc: 0, fonte: 'Manual' });
-    });
+    // Posição definida apenas por GPS — sem toque manual
 
     iniciarGPS(L, map, iconeUsuario);
 
@@ -175,21 +168,14 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     }
   }
 
-  function colocarMarcadorUsuario(L, map, icone, lat, lng, arrastavel = false) {
+  function colocarMarcadorUsuario(L, map, icone, lat, lng) {
     if (markerRef.current) {
       markerRef.current.setLatLng([lat, lng]);
     } else {
-      markerRef.current = L.marker([lat, lng], { icon: icone, draggable: arrastavel })
+      markerRef.current = L.marker([lat, lng], { icon: icone, draggable: false })
         .addTo(map)
-        .bindPopup(arrastavel ? '📍 Posição manual — arraste para ajustar' : '📍 Sua localização')
+        .bindPopup('📍 Sua localização')
         .openPopup();
-
-      if (arrastavel) {
-        markerRef.current.on('dragend', () => {
-          const p = markerRef.current.getLatLng();
-          onLocationUpdate({ lat: p.lat, lng: p.lng, acc: 0, fonte: 'Manual' });
-        });
-      }
     }
   }
 
@@ -231,7 +217,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     const acc = Math.round(pos.coords.accuracy);
 
     try {
-      colocarMarcadorUsuario(L, m, icone, lat, lng, false);
+      colocarMarcadorUsuario(L, m, icone, lat, lng);
 
       if (circleRef.current) {
         circleRef.current.setLatLng([lat, lng]).setRadius(acc);
@@ -285,7 +271,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
           pointerEvents: 'none', whiteSpace: 'nowrap',
         }}>
           {modo === 'erro'
-            ? '👆 Toque no mapa para marcar sua posição'
+            ? '🔴 GPS indisponível. Vá para área aberta.'
             : '📡 Buscando GPS… aguarde ou toque no mapa'}
         </div>
       )}
