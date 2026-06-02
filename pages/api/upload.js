@@ -1,17 +1,19 @@
 /**
  * pages/api/upload.js
  * Proxy server-side para o Pinata — JWT nunca exposto no browser.
- * Validações de segurança: tamanho máx, tipo de arquivo, rate básico.
+ *
+ * Recebe SEMPRE JSON:
+ *   { type: 'image', data: base64, filename, mime }  → upload de imagem
+ *   { type: 'json',  data: {...} }                    → upload de metadados
+ *
+ * Base64 evita os problemas de proxy de multipart no Next.js/Vercel.
  */
 
 export const config = {
   api: {
-    bodyParser: false,
-    responseLimit: '10mb',
+    bodyParser: { sizeLimit: '12mb' }, // base64 incha ~33%, então 12mb p/ imagem de 8mb
   },
 };
-
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -27,30 +29,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const contentType = req.headers['content-type'] || '';
+    const { type, data, filename, mime } = req.body || {};
 
-    // ── Upload de imagem ───────────────────────────────────
-    if (contentType.includes('multipart/form-data')) {
-      const chunks = [];
-      let total = 0;
-      for await (const chunk of req) {
-        total += chunk.length;
-        if (total > MAX_SIZE) {
-          return res.status(413).json({ error: 'Arquivo muito grande (máx 10MB).' });
-        }
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
+    // ── Upload de imagem (base64 → Blob → Pinata) ──────────
+    if (type === 'image') {
+      if (!data) return res.status(400).json({ error: 'Imagem ausente.' });
+
+      // Remove prefixo data:image/...;base64, se vier
+      const base64 = data.includes(',') ? data.split(',')[1] : data;
+      const buffer = Buffer.from(base64, 'base64');
+
+      // Monta FormData nativo (Node 18+ na Vercel)
+      const form = new FormData();
+      const blob = new Blob([buffer], { type: mime || 'image/jpeg' });
+      form.append('file', blob, filename || 'arte.jpg');
 
       const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method:  'POST',
-        headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': contentType },
-        body:    buffer,
-        duplex:  'half',
+        headers: { Authorization: `Bearer ${jwt}` },
+        body:    form,
       });
 
       if (!pinataRes.ok) {
-        console.error('[/api/upload] Pinata file status:', pinataRes.status);
+        const errTxt = await pinataRes.text();
+        console.error('[/api/upload] Pinata file:', pinataRes.status, errTxt);
         return res.status(502).json({ error: 'Falha no upload da imagem.' });
       }
 
@@ -59,27 +61,18 @@ export default async function handler(req, res) {
     }
 
     // ── Upload de metadados JSON ───────────────────────────
-    if (contentType.includes('application/json')) {
-      const chunks = [];
-      let total = 0;
-      for await (const chunk of req) {
-        total += chunk.length;
-        if (total > 1024 * 100) { // metadados máx 100KB
-          return res.status(413).json({ error: 'Metadados muito grandes.' });
-        }
-        chunks.push(chunk);
-      }
-      const json = JSON.parse(Buffer.concat(chunks).toString());
+    if (type === 'json') {
+      if (!data) return res.status(400).json({ error: 'Metadados ausentes.' });
 
       const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
         method:  'POST',
         headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ pinataContent: json }),
-        duplex:  'half',
+        body:    JSON.stringify({ pinataContent: data }),
       });
 
       if (!pinataRes.ok) {
-        console.error('[/api/upload] Pinata json status:', pinataRes.status);
+        const errTxt = await pinataRes.text();
+        console.error('[/api/upload] Pinata json:', pinataRes.status, errTxt);
         return res.status(502).json({ error: 'Falha no upload dos metadados.' });
       }
 
@@ -87,7 +80,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}` });
     }
 
-    return res.status(400).json({ error: 'Tipo de conteúdo não suportado.' });
+    return res.status(400).json({ error: 'Tipo inválido.' });
 
   } catch (err) {
     console.error('[/api/upload]', err.message);

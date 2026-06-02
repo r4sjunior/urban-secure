@@ -34,25 +34,44 @@ const STEPS = [
   { key: 'minting',      label: 'Mintando NFT na Solana',     icon: '⛓️' },
 ];
 
-// ─── Upload via API Route (JWT fica no servidor, nunca exposto) ──
+// ─── Upload via API Route (JWT no servidor) — base64 confiável ──
+
+// Converte File em base64 (data URL → string pura)
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result); // data:image/...;base64,xxxx
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function uploadFile(file) {
-  const form = new FormData();
-  form.append('file', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`Upload imagem: ${(await res.json()).error}`);
-  const { url } = await res.json();
-  return url;
+  const base64 = await fileToBase64(file);
+  const res = await fetch('/api/upload', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type:     'image',
+      data:     base64,
+      filename: file.name || 'arte.jpg',
+      mime:     file.type || 'image/jpeg',
+    }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Upload imagem: ${json.error || res.status}`);
+  return json.url;
 }
 
 async function uploadJson(obj) {
   const res = await fetch('/api/upload', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(obj),
+    body:    JSON.stringify({ type: 'json', data: obj }),
   });
-  if (!res.ok) throw new Error(`Upload metadados: ${(await res.json()).error}`);
-  const { url } = await res.json();
-  return url;
+  const json = await res.json();
+  if (!res.ok) throw new Error(`Upload metadados: ${json.error || res.status}`);
+  return json.url;
 }
 
 // ─── Metadados Metaplex ───────────────────────────────────────
