@@ -3,9 +3,27 @@ const require = createRequire(import.meta.url);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Desativado: o StrictMode desmonta/remonta componentes duas vezes no dev,
-  // o que quebra o Leaflet (mapa é destruído antes do callback do GPS disparar).
   reactStrictMode: false,
+
+  // ── Headers de segurança globais ──────────────────────────
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Content-Type-Options',   value: 'nosniff' },
+          { key: 'X-Frame-Options',          value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy',          value: 'strict-origin-when-cross-origin' },
+          { key: 'X-XSS-Protection',         value: '1; mode=block' },
+          { key: 'Permissions-Policy',       value: 'geolocation=(self), camera=(self)' },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+        ],
+      },
+    ];
+  },
 
   webpack: (config, { isServer, webpack }) => {
     if (!isServer) {

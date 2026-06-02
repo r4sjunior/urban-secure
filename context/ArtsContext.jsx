@@ -1,6 +1,7 @@
 /**
  * context/ArtsContext.jsx
- * Estado global das artes com sessionStorage cache e busca em background.
+ * Estado global das artes — busca SEM precisar de carteira conectada.
+ * Cache em sessionStorage + busca em background.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
@@ -38,63 +39,54 @@ export function ArtsProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false);
   const fetchingRef = useRef(false);
 
-  // Carrega cache imediatamente
-  useEffect(() => {
-    const cached = readCache(network);
-    if (cached?.length) {
-      console.log(`[ArtsContext] cache: ${cached.length} artes`);
-      setArts(cached);
-    }
-    // Busca sempre ao montar (em background)
-    fetchFromChain();
-  }, []);
-
+  // fetchFromChain definido ANTES do useEffect que o chama
   const fetchFromChain = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     setIsLoading(true);
 
     try {
-      console.log('[ArtsContext] buscando /api/arts…');
       const res = await fetch('/api/arts');
-
       if (!res.ok) {
-        console.error('[ArtsContext] /api/arts retornou', res.status);
+        console.error('[ArtsContext] /api/arts status', res.status);
         return;
       }
 
       const data = await res.json();
+      const chainArts = data?.arts ?? [];
 
-      if (!data.arts) {
-        console.error('[ArtsContext] resposta sem campo arts:', data);
+      if (chainArts.length === 0) {
+        console.log('[ArtsContext] nenhuma arte encontrada ainda');
         return;
       }
 
-      if (data.arts.length === 0) {
-        console.log('[ArtsContext] nenhuma arte encontrada no Helius');
-        return;
-      }
-
-      console.log(`[ArtsContext] ${data.arts.length} artes recebidas da chain`);
-
+      console.log(`[ArtsContext] ${chainArts.length} artes recebidas`);
       setArts(prev => {
-        const merged = mergeArts(prev, data.arts);
+        const merged = mergeArts(prev, chainArts);
         writeCache(network, merged);
-        console.log(`[ArtsContext] total no mapa: ${merged.length}`);
         return merged;
       });
 
     } catch (err) {
-      console.error('[ArtsContext] erro ao buscar artes no Helius:', err.message);
+      console.error('[ArtsContext] erro ao buscar artes:', err.message);
     } finally {
       setIsLoading(false);
       fetchingRef.current = false;
     }
   }, [network]);
 
+  // Carrega cache + busca ao montar — SEM exigir carteira
+  useEffect(() => {
+    const cached = readCache(network);
+    if (cached?.length) {
+      console.log(`[ArtsContext] cache: ${cached.length} artes`);
+      setArts(cached);
+    }
+    fetchFromChain();
+  }, [fetchFromChain, network]);
+
   // addArt: atualiza mapa imediatamente após mint
   const addArt = useCallback((art) => {
-    console.log('[ArtsContext] nova arte adicionada:', art.id);
     setArts(prev => {
       const merged = mergeArts(prev, [art]);
       writeCache(network, merged);

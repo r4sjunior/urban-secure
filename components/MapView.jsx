@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 
+// Escapa HTML para prevenir XSS nos popups (dados vêm da blockchain)
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export default function MapView({ onLocationUpdate, arts = [], isLoading = false }) {
   const containerRef  = useRef(null);
   const mapRef        = useRef(null);
@@ -68,11 +78,19 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
         iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-38],
       });
 
+      // Valida URL da imagem — só aceita https do gateway IPFS
+      const safeImg = (art.imageUrl || '').startsWith('https://')
+        ? escapeHtml(art.imageUrl) : '';
+      const safeName = escapeHtml(art.name);
+      const safeDesc = escapeHtml(art.description);
+      const safeArtist = escapeHtml(art.artistName || '');
+
       const popup = `
         <div style="font-family:Arial,sans-serif;min-width:160px;max-width:200px;">
-          ${art.imageUrl ? `<img src="${art.imageUrl}" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
-          <strong style="font-size:13px;color:#1a3a5c;display:block;margin-bottom:2px;">${art.name}</strong>
-          <span style="font-size:11px;color:#555;display:block;">${art.description}</span>
+          ${safeImg ? `<img src="${safeImg}" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
+          <strong style="font-size:13px;color:#1a3a5c;display:block;margin-bottom:2px;">${safeName}</strong>
+          ${safeArtist ? `<span style="font-size:10px;color:#888;display:block;margin-bottom:2px;">por ${safeArtist}</span>` : ''}
+          <span style="font-size:11px;color:#555;display:block;">${safeDesc}</span>
         </div>`;
 
       const marker = L.marker([art.lat, art.lng], { icon })

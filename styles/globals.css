@@ -620,3 +620,42 @@ body {
      não interfere com o canvas do Leaflet */
   isolation: isolate;
 }
+
+/* ── Busca por artista ── */
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-input {
+  width: 100%;
+  padding: 10px 36px 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #2e2e2e);
+  background: var(--bg-field, #222);
+  color: var(--text-main, #fff);
+  font-size: 14px;
+  outline: none;
+}
+.search-input:focus { border-color: var(--rasta-green, #2E7D32); }
+.search-input::placeholder { color: #555; }
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-results {
+  font-size: 11px;
+  color: var(--rasta-green-lt, #69f0ae);
+  text-align: center;
+}

@@ -85,6 +85,8 @@ function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, arti
     // ── Atributos públicos — legíveis por qualquer usuário ───────
     // trait_type e value devem ser strings (padrão Metaplex/OpenSea)
     attributes: [
+      // Nome do artista — usado na busca
+      { trait_type: 'Artista',   value: name.replace('Urban Art — ', '') },
       // Coordenadas GPS — chave da funcionalidade do app
       { trait_type: 'Latitude',  value: lat.toFixed(6)       },
       { trait_type: 'Longitude', value: lng.toFixed(6)       },
@@ -158,6 +160,17 @@ export default function Home() {
   const [mintResult,   setMintResult]   = useState(null);
   // Estado global de artes (cache + chain) via Context
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
+  const [busca, setBusca] = useState(''); // busca por nome do artista
+
+  // Filtra artes pelo nome do artista ou da obra
+  const artsFiltradas = busca.trim()
+    ? arts.filter(a => {
+        const termo = busca.toLowerCase();
+        return (a.artistName || '').toLowerCase().includes(termo)
+            || (a.name || '').toLowerCase().includes(termo)
+            || (a.description || '').toLowerCase().includes(termo);
+      })
+    : arts;
 
   // Debug wallet state
   useEffect(() => {
@@ -234,7 +247,7 @@ export default function Home() {
       setMintStep('success');
 
       addArt({
-        id: mintAddress, name: nftName, description: descricao,
+        id: mintAddress, name: nftName, artistName: nome, description: descricao,
         lat: gps.lat, lng: gps.lng, imageUrl: imageUri,
         artistWallet, timestamp: Date.now(),
       });
@@ -284,11 +297,30 @@ export default function Home() {
 
         {/* Mapa — já é dynamic ssr:false, mas o ClientOnly garante contexto limpo */}
         <div className="map-container">
-          <MapView onLocationUpdate={handleLocationUpdate} arts={arts} isLoading={isLoadingArts} />
+          <MapView onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
         </div>
 
         <div className="form-panel">
           <div className={`gps-status ${gpsClass}`}>{gpsLabel}</div>
+
+          {/* Busca por artista */}
+          <div className="search-wrap">
+            <input
+              className="search-input"
+              type="text"
+              placeholder="🔍 Buscar por artista ou obra…"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+            />
+            {busca && (
+              <button className="search-clear" onClick={() => setBusca('')}>✕</button>
+            )}
+          </div>
+          {busca && (
+            <p className="search-results">
+              {artsFiltradas.length} resultado{artsFiltradas.length !== 1 ? 's' : ''} para "{busca}"
+            </p>
+          )}
 
           {/* Wallet — 100% client-side via WalletHandler dynamic */}
           <WalletHandler />

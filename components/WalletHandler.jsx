@@ -135,13 +135,18 @@ export default function WalletHandler() {
       );
 
       if (found) {
-        console.log(`[WalletHandler] In-app browser detectado (${targetName}) — conectando automaticamente…`);
+        console.log(`[WalletHandler] In-app browser (${targetName}) — conectando…`);
         setConnecting(true);
+        // select() é síncrono mas connect() precisa esperar o próximo tick
+        // para o adapter selecionado estar ativo
         wallet.select(found.adapter.name);
-        wallet.connect().catch((err) => {
-          console.error('[WalletHandler] Auto-connect falhou:', err);
-          setConnecting(false);
-        });
+        const timer = setTimeout(() => {
+          wallet.connect().catch((err) => {
+            console.error('[WalletHandler] Auto-connect falhou:', err?.message);
+            setConnecting(false);
+          });
+        }, 250);
+        return () => clearTimeout(timer);
       }
     }
   }, [env, wallet.connected, wallet.wallets]);
