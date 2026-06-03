@@ -9,13 +9,10 @@ import { ArtsProvider } from '../context/ArtsContext';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import '../styles/globals.css';
 
-function WalletProviders({ children }) {
-  const network  = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+function Providers({ children }) {
+  const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
-  const wallets  = useMemo(() => [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-  ], []);
+  const wallets = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
@@ -23,13 +20,10 @@ function WalletProviders({ children }) {
         wallets={wallets}
         autoConnect={false}
         localStorageKey="urban-secure:wallet"
-        onError={err => console.error('[WalletProvider]', err?.message, err?.error?.message)}
+        onError={(e) => console.error('[WalletProvider]', e?.message, e?.error?.message)}
       >
         <WalletModalProvider>
-          {/* ArtsProvider fica dentro do WalletProvider para acessar useWallet() */}
-          <ArtsProvider>
-            {children}
-          </ArtsProvider>
+          <ArtsProvider>{children}</ArtsProvider>
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
@@ -40,10 +34,5 @@ export default function App({ Component, pageProps }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
-
-  return (
-    <WalletProviders>
-      <Component {...pageProps} />
-    </WalletProviders>
-  );
+  return <Providers><Component {...pageProps} /></Providers>;
 }

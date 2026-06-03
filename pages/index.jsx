@@ -1,414 +1,263 @@
 import { useState, useCallback, useEffect } from 'react';
-import dynamic                               from 'next/dynamic';
-import Head                                  from 'next/head';
-import { useWallet, useConnection }          from '@solana/wallet-adapter-react';
-
-// ── Dynamic imports — ssr:false em tudo que toca window/wallet ──
-const WalletMultiButton = dynamic(
-  () => import('@solana/wallet-adapter-react-ui').then(m => m.WalletMultiButton),
-  { ssr: false, loading: () => <div className="wallet-btn-skeleton" /> }
-);
-
-const MapView = dynamic(
-  () => import('../components/MapView'),
-  { ssr: false, loading: () => <div className="map-skeleton" /> }
-);
-
-const MintOverlay = dynamic(
-  () => import('../components/MintOverlay'),
-  { ssr: false }
-);
-
-const WalletHandler = dynamic(
-  () => import('../components/WalletHandler'),
-  { ssr: false, loading: () => <div className="wallet-btn-skeleton" /> }
-);
-
+import dynamic from 'next/dynamic';
+import Head from 'next/head';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
-import { resizeImage }       from '../lib/resizeImage';
+import { resizeImage } from '../lib/resizeImage';
 
-// ─── Etapas do mint ───────────────────────────────────────────
+const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
+const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
+const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
+
 const STEPS = [
-  { key: 'upload-image', label: 'Enviando imagem ao IPFS',    icon: '🖼️' },
-  { key: 'upload-meta',  label: 'Enviando metadados ao IPFS', icon: '📄' },
-  { key: 'minting',      label: 'Mintando NFT na Solana',     icon: '⛓️' },
+  { key: 'upload-image', label: 'Enviando imagem',   icon: '🖼️' },
+  { key: 'upload-meta',  label: 'Enviando dados',    icon: '📄' },
+  { key: 'minting',      label: 'Mintando NFT',      icon: '⛓️' },
 ];
 
-// ─── Upload via API Route (JWT no servidor) — base64 confiável ──
-
-// Converte File em base64 (data URL → string pura)
+// ── Upload helpers (base64 → /api/upload) ──
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result); // data:image/...;base64,xxxx
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
   });
 }
-
 async function uploadFile(file) {
   const base64 = await fileToBase64(file);
   const res = await fetch('/api/upload', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      type:     'image',
-      data:     base64,
-      filename: file.name || 'arte.jpg',
-      mime:     file.type || 'image/jpeg',
-    }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'image', data: base64, filename: file.name || 'arte.jpg', mime: file.type || 'image/jpeg' }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(`Upload imagem: ${json.error || res.status}`);
   return json.url;
 }
-
 async function uploadJson(obj) {
   const res = await fetch('/api/upload', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ type: 'json', data: obj }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'json', data: obj }),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(`Upload metadados: ${json.error || res.status}`);
+  if (!res.ok) throw new Error(`Upload dados: ${json.error || res.status}`);
   return json.url;
 }
 
-// ─── Metadados Metaplex ───────────────────────────────────────
-/**
- * buildMetadata — padrão Metaplex Token Metadata v1.1
- *
- * Campos obrigatórios para leitura pública:
- *   name, symbol, description, image → exibidos em todos os marketplaces
- *   attributes[].trait_type / value  → indexados pelo Metaplex e explorers
- *   seller_fee_basis_points          → royalties (500 = 5%)
- *   properties.creators              → criador verificável on-chain
- *
- * Qualquer usuário pode ler os atributos (lat/lng) via:
- *   1. fetchMetadataJson(nft.uri) → JSON público no IPFS
- *   2. Explorer: solscan.io → Attributes tab
- *   3. Helius DAS: getAsset(mintAddress) → attributes[]
- *
- * VALIDADO contra: https://docs.metaplex.com/programs/token-metadata/token-standard
- */
+// ── Metadados Metaplex ──
 function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, artistWallet, network }) {
   return {
-    // ── Campos obrigatórios (Metaplex Token Metadata Standard) ──
-    name,
-    symbol:      'URBAN',
-    description,
-    image:       imageUri,
-    // Royalty: 500 basis points = 5% em cada revenda secundária
+    name, symbol: 'URBAN', description, image: imageUri,
     seller_fee_basis_points: 500,
-
-    // ── Atributos públicos — legíveis por qualquer usuário ───────
-    // trait_type e value devem ser strings (padrão Metaplex/OpenSea)
     attributes: [
-      // Nome do artista — usado na busca
       { trait_type: 'Artista',   value: name.replace('Urban Art — ', '') },
-      // Coordenadas GPS — chave da funcionalidade do app
-      { trait_type: 'Latitude',  value: lat.toFixed(6)       },
-      { trait_type: 'Longitude', value: lng.toFixed(6)       },
-      // Metadados adicionais
-      { trait_type: 'Precisão',  value: acc > 0 ? `±${acc}m` : 'Manual' },
-      { trait_type: 'Fonte GPS', value: fonte   || 'GPS'     },
-      { trait_type: 'Rede',      value: network || 'devnet'  },
-      { trait_type: 'Categoria', value: 'Arte Urbana'        },
+      { trait_type: 'Latitude',  value: lat.toFixed(6) },
+      { trait_type: 'Longitude', value: lng.toFixed(6) },
+      { trait_type: 'Precisão',  value: acc > 0 ? `±${acc}m` : 'GPS' },
+      { trait_type: 'Fonte GPS', value: fonte || 'GPS' },
+      { trait_type: 'Rede',      value: network || 'devnet' },
+      { trait_type: 'Categoria', value: 'Arte Urbana' },
     ],
-
-    // ── Propriedades (Metaplex v1.1) ─────────────────────────────
     properties: {
       category: 'image',
-      files: [
-        {
-          uri:  imageUri,
-          type: 'image/jpeg',
-          // cdn: true — opcional, indica que o arquivo está em CDN rápido
-        },
-      ],
-      creators: [
-        {
-          address: artistWallet,
-          share:   100,       // 100% dos royalties para o artista
-          // verified é setado on-chain pelo createNft(), não aqui
-        },
-      ],
+      files: [{ uri: imageUri, type: 'image/jpeg' }],
+      creators: [{ address: artistWallet, share: 100 }],
     },
   };
 }
 
-// ─── Mint via Metaplex UMI ────────────────────────────────────
-async function mintUrbanArt({ wallet, metadataUri, name, network }) {
-  const { createUmi }               = await import('@metaplex-foundation/umi-bundle-defaults');
-  const { walletAdapterIdentity }   = await import('@metaplex-foundation/umi-signer-wallet-adapters');
+// ── Mint via Helius RPC proxy ──
+async function mintUrbanArt({ wallet, metadataUri, name }) {
+  const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
+  const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
   const { mplTokenMetadata, createNft } = await import('@metaplex-foundation/mpl-token-metadata');
   const { generateSigner, percentAmount } = await import('@metaplex-foundation/umi');
 
-  const rpcUrl = network === 'mainnet-beta'
-    ? 'https://api.mainnet-beta.solana.com'
-    : 'https://api.devnet.solana.com';
-
-  const umi = createUmi(rpcUrl)
-    .use(walletAdapterIdentity(wallet))
-    .use(mplTokenMetadata());
+  const rpcUrl = `${window.location.origin}/api/rpc`;
+  const umi = createUmi(rpcUrl).use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
 
   const mintSigner = generateSigner(umi);
   await createNft(umi, {
     mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
     sellerFeeBasisPoints: percentAmount(5), isMutable: true,
-  }).sendAndConfirm(umi, { confirm: { commitment: 'confirmed' } });
+  }).sendAndConfirm(umi, { confirm: { commitment: 'confirmed' }, send: { skipPreflight: false, maxRetries: 3 } });
 
   return mintSigner.publicKey.toString();
 }
 
-// ─────────────────────────────────────────────────────────────
-// Componente principal
-// ─────────────────────────────────────────────────────────────
 export default function Home() {
-  const wallet         = useWallet();
-  const { connection } = useConnection();
-
-  const [nome,         setNome]         = useState('');
-  const [descricao,    setDescricao]    = useState('');
-  const [imageFile,    setImageFile]    = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [gps,          setGps]          = useState(null);
-  const [isMinting,    setIsMinting]    = useState(false);
-  const [mintStep,     setMintStep]     = useState(null);
-  const [mintError,    setMintError]    = useState(null);
-  const [mintResult,   setMintResult]   = useState(null);
-  // Estado global de artes (cache + chain) via Context
+  const wallet = useWallet();
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
-  const [busca, setBusca] = useState(''); // busca por nome do artista
 
-  // Filtra artes pelo nome do artista ou da obra
+  const [nome, setNome] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [gps, setGps] = useState(null);
+  const [busca, setBusca] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const [isMinting, setIsMinting] = useState(false);
+  const [mintStep, setMintStep] = useState(null);
+  const [mintError, setMintError] = useState(null);
+  const [mintResult, setMintResult] = useState(null);
+
+  const handleLocationUpdate = useCallback(d => setGps(d), []);
+
   const artsFiltradas = busca.trim()
     ? arts.filter(a => {
-        const termo = busca.toLowerCase();
-        return (a.artistName || '').toLowerCase().includes(termo)
-            || (a.name || '').toLowerCase().includes(termo)
-            || (a.description || '').toLowerCase().includes(termo);
+        const t = busca.toLowerCase();
+        return (a.artistName||'').toLowerCase().includes(t)
+            || (a.name||'').toLowerCase().includes(t)
+            || (a.description||'').toLowerCase().includes(t);
       })
     : arts;
-
-  // Debug wallet state
-  useEffect(() => {
-    console.group('[Urban Secure] Wallet');
-    console.log('connected:',  wallet.connected);
-    console.log('publicKey:',  wallet.publicKey?.toBase58() ?? 'null');
-    console.log('name:',       wallet.wallet?.adapter?.name ?? 'none');
-    console.log('readyState:', wallet.wallet?.adapter?.readyState ?? 'N/A');
-    console.groupEnd();
-  }, [wallet.connected, wallet.publicKey]);
-
-  const handleLocationUpdate = useCallback(data => setGps(data), []);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result);
-    reader.readAsDataURL(file);
+    const r = new FileReader();
+    r.onload = () => setImagePreview(r.result);
+    r.readAsDataURL(file);
   };
 
   function resetForm() {
-    setNome(''); setDescricao('');
-    setImageFile(null); setImagePreview('');
+    setNome(''); setDescricao(''); setImageFile(null); setImagePreview('');
     setMintStep(null); setMintError(null); setMintResult(null);
   }
-
   function handleOverlayDismiss() {
     if (mintError) { setMintError(null); setMintStep(null); setIsMinting(false); }
-    else resetForm();
+    else { resetForm(); setSheetOpen(false); }
   }
 
   const handleMint = async () => {
-    if (mintStep === 'success') { resetForm(); return; }
-    if (mintError)              { setMintError(null); return; }
-
-    if (!wallet.connected || !wallet.publicKey)
-      return setMintError('Conecte sua carteira primeiro.');
+    if (!wallet.connected || !wallet.publicKey) return setMintError('Conecte sua carteira primeiro.');
     const gpsOk = gps && !gps.error && gps.lat && gps.lng;
-    if (!gpsOk)
-      return setMintError('Aguardando GPS. Vá para área aberta.');
-    if (!nome.trim() || !descricao.trim())
-      return setMintError('Preencha nome e descrição.');
-    if (!imageFile)
-      return setMintError('Selecione ou fotografe a obra.');
+    if (!gpsOk) return setMintError('Aguardando GPS. Vá para área aberta.');
+    if (!nome.trim() || !descricao.trim()) return setMintError('Preencha nome e descrição.');
+    if (!imageFile) return setMintError('Selecione ou fotografe a obra.');
 
     const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
     const artistWallet = wallet.publicKey.toBase58();
-    const nftName      = `Urban Art — ${nome}`;
+    const nftName = `Urban Art — ${nome}`;
 
-    setIsMinting(true);
-    setMintError(null);
-    setMintResult(null);
+    setIsMinting(true); setMintError(null); setMintResult(null);
 
     try {
       setMintStep('upload-image');
-      const resized  = await resizeImage(imageFile, 800, 0.85);
+      const resized = await resizeImage(imageFile, 800, 0.85);
       const imageUri = await uploadFile(resized);
 
       setMintStep('upload-meta');
-      const metadata    = buildMetadata({ name: nftName, description: descricao, imageUri,
-        lat: gps.lat, lng: gps.lng, acc: gps.acc, fonte: gps.fonte, artistWallet, network });
+      const metadata = buildMetadata({ name: nftName, description: descricao, imageUri, lat: gps.lat, lng: gps.lng, acc: gps.acc, fonte: gps.fonte, artistWallet, network });
       const metadataUri = await uploadJson(metadata);
 
       setMintStep('minting');
-      const mintAddress = await mintUrbanArt({ wallet, metadataUri, name: nftName, network });
+      const mintAddress = await mintUrbanArt({ wallet, metadataUri, name: nftName });
 
       setMintResult({
-        address:     mintAddress,
+        address: mintAddress,
         explorerUrl: `https://explorer.solana.com/address/${mintAddress}?cluster=${network}`,
-        solscanUrl:  `https://solscan.io/token/${mintAddress}${network === 'devnet' ? '?cluster=devnet' : ''}`,
+        solscanUrl: `https://solscan.io/token/${mintAddress}${network==='devnet'?'?cluster=devnet':''}`,
       });
       setMintStep('success');
-
-      addArt({
-        id: mintAddress, name: nftName, artistName: nome, description: descricao,
-        lat: gps.lat, lng: gps.lng, imageUrl: imageUri,
-        artistWallet, timestamp: Date.now(),
-      });
+      addArt({ id: mintAddress, name: nftName, artistName: nome, description: descricao, lat: gps.lat, lng: gps.lng, imageUrl: imageUri, artistWallet, timestamp: Date.now() });
     } catch (err) {
       console.error('[handleMint]', err);
-      setMintError(err.message || 'Erro desconhecido.');
-      setMintStep(null);
-    } finally {
-      setIsMinting(false);
-    }
+      let msg = err.message || 'Erro desconhecido.';
+      if (msg.includes('insufficient') || msg.includes('0x1')) msg = 'Saldo insuficiente. Pegue SOL em faucet.solana.com';
+      else if (msg.includes('rejected')) msg = 'Transação cancelada na carteira.';
+      else if (msg.includes('blockhash') || msg.includes('timeout')) msg = 'Rede congestionada. Tente novamente.';
+      setMintError(msg); setMintStep(null);
+    } finally { setIsMinting(false); }
   };
 
-  const gpsOk   = gps && !gps.error && gps.lat && gps.lng; // aceita qualquer precisão GPS
-  const canMint = wallet.connected && gpsOk && nome.trim() && descricao.trim() && imageFile && !isMinting;
-  const isBusy  = ['upload-image', 'upload-meta', 'minting'].includes(mintStep);
-
-  const gpsClass = !gps ? 'buscando' : gps.error ? 'erro' : 'ok';
-  const gpsLabel = !gps
-    ? '📡 Buscando GPS…'
-    : gps.error
-    ? `❌ ${gps.error}`
-    : `✅ GPS — ±${gps.acc}m`;
-
-  function mintBtnLabel() {
-    if (mintStep === 'success') return '✅ NFT Mintado! Registrar outra →';
-    if (isBusy) {
-      const s = STEPS.find(s => s.key === mintStep);
-      return s ? `${s.icon} ${s.label}…` : '⏳ Processando…';
-    }
-    if (mintError) return '🔄 Tentar novamente';
-    return '🎨 Mintar na Solana';
-  }
+  const gpsOk = gps && !gps.error && gps.lat && gps.lng;
+  const gpsClass = !gps ? 'wait' : gps.error ? 'err' : 'ok';
+  const gpsLabel = !gps ? 'Buscando GPS…' : gps.error ? gps.error : `GPS ±${gps.acc}m`;
 
   return (
     <>
       <Head>
-        <title>Urban Secure</title>
-        <meta name="description" content="Arte urbana na blockchain Solana" />
+        <title>Urban Secure · Arte na Blockchain</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#0a0a0f" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <link rel="manifest" href="/manifest.json" />
+        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
 
       <div className="app">
-        <header className="app-header">🌍 Urban Secure</header>
+        {/* Fundo animado */}
+        <div className="bg-mesh" />
+        <div className="bg-grid" />
 
-        {/* Mapa — já é dynamic ssr:false, mas o ClientOnly garante contexto limpo */}
-        <div className="map-container">
-          <MapView onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
-        </div>
-
-        <div className="form-panel">
-          <div className={`gps-status ${gpsClass}`}>{gpsLabel}</div>
-
-          {/* Busca por artista */}
-          <div className="search-wrap">
-            <input
-              className="search-input"
-              type="text"
-              placeholder="🔍 Buscar por artista ou obra…"
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-            />
-            {busca && (
-              <button className="search-clear" onClick={() => setBusca('')}>✕</button>
-            )}
+        {/* Topbar */}
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand-mark">◢◣</span>
+            <span className="brand-name">URBAN<span className="brand-accent">SECURE</span></span>
           </div>
-          {busca && (
-            <p className="search-results">
-              {artsFiltradas.length} resultado{artsFiltradas.length !== 1 ? 's' : ''} para "{busca}"
-            </p>
-          )}
+          <div className={`gps-chip ${gpsClass}`}>
+            <span className="gps-led" />{gpsLabel}
+          </div>
+        </header>
 
-          {/* Wallet — 100% client-side via WalletHandler dynamic */}
-          <WalletHandler />
+        {/* Mapa em tela cheia */}
+        <main className="map-stage">
+          <MapView onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
 
-          <input className="field" placeholder="Nome do artista"
-            value={nome} onChange={e => setNome(e.target.value)}
-            maxLength={50} disabled={isBusy} />
+          {/* Busca flutuante */}
+          <div className="search-float">
+            <input className="search-in" placeholder="🔍 Buscar artista ou obra…" value={busca} onChange={e=>setBusca(e.target.value)} />
+            {busca && <button className="search-x" onClick={()=>setBusca('')}>✕</button>}
+          </div>
+        </main>
 
-          <textarea className="field" placeholder="Descrição da obra"
-            value={descricao} onChange={e => setDescricao(e.target.value)}
-            rows={2} maxLength={200} disabled={isBusy} />
-
-          <label className="file-label" style={{ opacity: isBusy ? 0.5 : 1 }}>
-            📷 {imageFile ? imageFile.name : 'Selecionar / tirar foto'}
-            <input type="file" accept="image/*" capture="environment"
-              onChange={handleImageChange} disabled={isBusy} style={{ display: 'none' }} />
-          </label>
-
-          {imagePreview && <img src={imagePreview} alt="Preview" className="preview" />}
-
-          {isBusy && (
-            <div className="mint-progress">
-              {STEPS.map((s, i) => {
-                const idx    = STEPS.findIndex(x => x.key === mintStep);
-                const isDone = i < idx;
-                const isAct  = s.key === mintStep;
-                return (
-                  <div key={s.key} className={`mint-progress-step ${isDone?'done':''} ${isAct?'active':''}`}>
-                    <span className="mint-progress-icon">{isDone?'✅':isAct?s.icon:'⏳'}</span>
-                    <span className="mint-progress-label">{s.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {mintError && <div className="mint-error">⚠️ {mintError}</div>}
-
-          <button
-            className={`mint-btn ${canMint || mintStep === 'success' || mintError ? 'active' : ''} ${mintStep === 'success' ? 'success' : ''} ${isBusy ? 'minting' : ''}`}
-            onClick={handleMint}
-            disabled={isBusy}
-          >
-            {mintBtnLabel()}
+        {/* Dock inferior */}
+        <nav className="dock">
+          <div className="dock-wallet"><WalletHandler /></div>
+          <button className="dock-cta" onClick={() => setSheetOpen(true)}>
+            <span className="dock-cta-icon">＋</span>
+            Registrar Arte
           </button>
+        </nav>
 
-          {mintResult && mintStep === 'success' && (
-            <div className="mint-result">
-              <p>🎉 Arte registrada na blockchain Solana!</p>
-              <p className="mint-address">{mintResult.address.slice(0,12)}…{mintResult.address.slice(-8)}</p>
-              <div className="mint-links">
-                <a href={mintResult.explorerUrl} target="_blank" rel="noreferrer">Explorer ↗</a>
-                <a href={mintResult.solscanUrl}  target="_blank" rel="noreferrer">Solscan ↗</a>
-              </div>
-            </div>
-          )}
+        {/* Bottom sheet do formulário */}
+        <div className={`sheet ${sheetOpen ? 'open' : ''}`}>
+          <div className="sheet-backdrop" onClick={() => !isMinting && setSheetOpen(false)} />
+          <div className="sheet-panel">
+            <div className="sheet-handle" onClick={() => !isMinting && setSheetOpen(false)} />
+            <h2 className="sheet-title">Registrar Arte Urbana</h2>
+            <p className="sheet-sub">Sua obra vira um NFT na Solana, na sua carteira.</p>
 
-          <p className="network-badge">
-            Rede: {process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet'} · IPFS: Pinata
-          </p>
+            <label className="upload-zone" style={{ backgroundImage: imagePreview ? `url(${imagePreview})` : 'none' }}>
+              {!imagePreview && <><span className="upload-ico">📷</span><span>Tirar foto / escolher</span></>}
+              <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isMinting} hidden />
+            </label>
+
+            <input className="fld" placeholder="Nome do artista" value={nome} onChange={e=>setNome(e.target.value)} maxLength={50} disabled={isMinting} />
+            <textarea className="fld" placeholder="Descrição da obra" value={descricao} onChange={e=>setDescricao(e.target.value)} rows={2} maxLength={200} disabled={isMinting} />
+
+            {mintError && !isMinting && <div className="err-box">⚠️ {mintError}</div>}
+
+            <button className="mint-cta" onClick={handleMint} disabled={isMinting}>
+              {isMinting ? '⏳ Processando…' : '🎨 Mintar na Solana'}
+            </button>
+
+            <p className="fee-note">Você paga apenas a taxa de gás da rede (~0.01 SOL)</p>
+          </div>
         </div>
-      </div>
 
-      <MintOverlay
-        visible={isMinting || mintStep === 'success' || !!mintError}
-        step={mintStep}
-        error={mintError}
-        onDismiss={handleOverlayDismiss}
-      />
+        {/* Overlay do mint — aparece durante processo, sucesso, ou erro fora do sheet */}
+        <MintOverlay
+          visible={isMinting || mintStep === 'success'}
+          step={mintStep}
+          error={null}
+          onDismiss={handleOverlayDismiss}
+        />
+      </div>
     </>
   );
 }

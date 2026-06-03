@@ -1,45 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Escapa HTML para prevenir XSS nos popups (dados vêm da blockchain)
 function escapeHtml(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 export default function MapView({ onLocationUpdate, arts = [], isLoading = false }) {
-  const containerRef  = useRef(null);
-  const mapRef        = useRef(null);
-  const markerRef     = useRef(null);
-  const circleRef     = useRef(null);
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const circleRef = useRef(null);
   const artMarkersRef = useRef([]);
-  const activeRef     = useRef(false);
-  const watchRef      = useRef(null);
-  const firstFix      = useRef(true);
+  const activeRef = useRef(false);
+  const watchRef = useRef(null);
+  const firstFix = useRef(true);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-
     const L = require('leaflet');
     require('leaflet/dist/leaflet.css');
 
-    const userIcon = L.icon({
-      iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-      shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      iconSize: [25,41], iconAnchor: [12,41], popupAnchor: [1,-34], shadowSize: [41,41],
+    const userIcon = L.divIcon({
+      className: '',
+      html: `<div class="me-marker"><div class="me-pulse"></div><div class="me-dot"></div></div>`,
+      iconSize: [24,24], iconAnchor: [12,12],
     });
 
-    const map = L.map(containerRef.current, { zoomControl: true })
+    const map = L.map(containerRef.current, { zoomControl: true, attributionControl: false })
       .setView([-5.79, -35.21], 13);
     mapRef.current = map;
     activeRef.current = true;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
+    // Tiles escuros (CARTO dark) para combinar com o tema
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
     }).addTo(map);
 
     startGPS(L, map, userIcon);
@@ -53,178 +48,93 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     };
   }, []);
 
-  // Renderiza marcadores das artes
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined') return;
     const L = require('leaflet');
-
     artMarkersRef.current.forEach(m => m.remove());
     artMarkersRef.current = [];
 
-    const COLORS = ['#D32F2F', '#F9A825', '#2E7D32'];
+    const COLORS = ['#FF3D71', '#FFD23F', '#3DFF88'];
 
     arts.forEach((art, i) => {
       const color = COLORS[i % COLORS.length];
-      const icon  = L.divIcon({
+      const icon = L.divIcon({
         className: '',
-        html: `<div style="
-          width:36px;height:36px;border-radius:50% 50% 50% 4px;
-          background:${color};border:2.5px solid rgba(255,255,255,0.4);
-          display:flex;align-items:center;justify-content:center;
-          font-size:17px;transform:rotate(-45deg);
-          box-shadow:0 3px 8px rgba(0,0,0,0.5);">
-          <span style="transform:rotate(45deg)">🎨</span>
+        html: `<div class="art-pin" style="--pc:${color}">
+          <div class="art-pin-body"><span>🎨</span></div>
+          <div class="art-pin-shadow"></div>
         </div>`,
-        iconSize: [36,36], iconAnchor: [18,36], popupAnchor: [0,-38],
+        iconSize: [40,48], iconAnchor: [20,46], popupAnchor: [0,-44],
       });
 
-      // Valida URL da imagem — só aceita https do gateway IPFS
-      const safeImg = (art.imageUrl || '').startsWith('https://')
-        ? escapeHtml(art.imageUrl) : '';
+      const safeImg = (art.imageUrl||'').startsWith('https://') ? escapeHtml(art.imageUrl) : '';
       const safeName = escapeHtml(art.name);
       const safeDesc = escapeHtml(art.description);
       const safeArtist = escapeHtml(art.artistName || '');
 
-      const popup = `
-        <div style="font-family:Arial,sans-serif;min-width:160px;max-width:200px;">
-          ${safeImg ? `<img src="${safeImg}" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;" onerror="this.style.display='none'"/>` : ''}
-          <strong style="font-size:13px;color:#1a3a5c;display:block;margin-bottom:2px;">${safeName}</strong>
-          ${safeArtist ? `<span style="font-size:10px;color:#888;display:block;margin-bottom:2px;">por ${safeArtist}</span>` : ''}
-          <span style="font-size:11px;color:#555;display:block;">${safeDesc}</span>
-        </div>`;
+      const popup = `<div class="art-popup">
+        ${safeImg ? `<img src="${safeImg}" onerror="this.style.display='none'"/>` : ''}
+        <strong>${safeName}</strong>
+        ${safeArtist ? `<em>por ${safeArtist}</em>` : ''}
+        <span>${safeDesc}</span>
+      </div>`;
 
       const marker = L.marker([art.lat, art.lng], { icon })
-        .addTo(mapRef.current)
-        .bindPopup(popup, { maxWidth: 220 });
-
+        .addTo(mapRef.current).bindPopup(popup, { maxWidth: 220, className: 'art-popup-wrap' });
       artMarkersRef.current.push(marker);
     });
   }, [arts]);
 
   function stopGPS() {
-    if (watchRef.current !== null) {
-      navigator.geolocation.clearWatch(watchRef.current);
-      watchRef.current = null;
-    }
+    if (watchRef.current !== null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; }
   }
 
   function startGPS(Larg, mapArg, iconArg) {
-    const L    = Larg   || require('leaflet');
-    const map  = mapArg || mapRef.current;
-    const icon = iconArg;
-    if (!map || !navigator.geolocation) {
-      onLocationUpdate({ error: 'GPS não disponível.' });
-      return;
-    }
-
+    const L = Larg || require('leaflet');
+    const map = mapArg || mapRef.current;
+    const icon = iconArg || L.divIcon({ className:'', html:'<div class="me-marker"><div class="me-dot"></div></div>', iconSize:[24,24], iconAnchor:[12,12] });
+    if (!map || !navigator.geolocation) { onLocationUpdate({ error: 'GPS não disponível.' }); return; }
     stopGPS();
 
     function onPos(pos) {
       if (!activeRef.current || !mapRef.current) return;
-      const m   = mapRef.current;
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const acc = Math.round(pos.coords.accuracy);
-
+      const m = mapRef.current;
+      const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
       try {
-        if (markerRef.current) {
-          markerRef.current.setLatLng([lat, lng]);
-        } else {
-          markerRef.current = L.marker([lat, lng], { icon })
-            .addTo(m)
-            .bindPopup('📍 Você está aqui')
-            .openPopup();
-        }
-
-        if (circleRef.current) {
-          circleRef.current.setLatLng([lat, lng]).setRadius(acc);
-        } else {
-          circleRef.current = L.circle([lat, lng], {
-            radius: acc, color: '#00c853', fillColor: '#00c853',
-            fillOpacity: 0.10, weight: 1.5,
-          }).addTo(m);
-        }
-
-        // Centraliza na primeira leitura — qualquer precisão
-        if (firstFix.current) {
-          m.setView([lat, lng], 17);
-          firstFix.current = false;
-        }
-      } catch (_) { return; }
-
-      onLocationUpdate({ lat, lng, acc, fonte: 'GPS' });
+        if (markerRef.current) markerRef.current.setLatLng([lat,lng]);
+        else markerRef.current = L.marker([lat,lng], { icon }).addTo(m);
+        if (circleRef.current) circleRef.current.setLatLng([lat,lng]).setRadius(acc);
+        else circleRef.current = L.circle([lat,lng], { radius:acc, color:'#3DFF88', fillColor:'#3DFF88', fillOpacity:0.08, weight:1 }).addTo(m);
+        if (firstFix.current) { m.setView([lat,lng], 17); firstFix.current = false; }
+      } catch {}
+      onLocationUpdate({ lat, lng, acc, fonte:'GPS' });
     }
-
     function onErr(err) {
       if (!activeRef.current) return;
       if (err.code === 3) {
-        // Timeout — tenta rede/Wi-Fi silenciosamente
-        watchRef.current = navigator.geolocation.watchPosition(
-          onPos,
-          () => onLocationUpdate({ error: 'GPS indisponível.' }),
-          { enableHighAccuracy: false, maximumAge: 10000, timeout: 30000 }
-        );
+        watchRef.current = navigator.geolocation.watchPosition(onPos,
+          () => onLocationUpdate({ error:'GPS indisponível.' }),
+          { enableHighAccuracy:false, maximumAge:10000, timeout:30000 });
         return;
       }
-      if (err.code === 1) onLocationUpdate({ error: 'Permissão de GPS negada.' });
-      else onLocationUpdate({ error: 'GPS indisponível.' });
+      onLocationUpdate({ error: err.code===1 ? 'Permissão de GPS negada.' : 'GPS indisponível.' });
     }
-
-    // Alta precisão — usa chip GPS do dispositivo
-    watchRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
-      enableHighAccuracy: true,
-      maximumAge: 0,
-      timeout: 15000,
-    });
+    watchRef.current = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy:true, maximumAge:0, timeout:30000 });
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-
-      {/* Contador de artes */}
+    <div style={{ width:'100%', height:'100%', position:'relative' }}>
+      <div ref={containerRef} style={{ width:'100%', height:'100%' }} />
       {arts.length > 0 && (
-        <div style={{
-          position: 'absolute', top: 10, right: 10, zIndex: 9999,
-          background: 'rgba(0,200,83,0.9)', color: '#000',
-          padding: '5px 12px', borderRadius: 16, fontSize: 12, fontWeight: 700,
-        }}>
-          🎨 {arts.length} obra{arts.length !== 1 ? 's' : ''}
-        </div>
+        <div className="map-counter">🎨 {arts.length} obra{arts.length!==1?'s':''}</div>
       )}
-
-      {/* Loading overlay */}
       {isLoading && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 9998,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 12,
-        }}>
-          <div style={{
-            width: 36, height: 36, border: '3px solid transparent',
-            borderTopColor: '#00c853', borderRightColor: '#F9A825',
-            borderBottomColor: '#D32F2F', borderRadius: '50%',
-            animation: 'spin 0.9s linear infinite',
-          }} />
-          <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>
-            Carregando artes…
-          </span>
+        <div className="map-loading">
+          <div className="map-spinner" />
+          <span>Carregando artes…</span>
         </div>
       )}
-
-      {/* Botão reativar GPS */}
-      <button
-        onClick={() => startGPS()}
-        title="Centralizar no meu GPS"
-        style={{
-          position: 'absolute', bottom: 80, right: 10, zIndex: 9999,
-          background: '#111', color: '#fff', border: '2px solid #333',
-          borderRadius: '50%', width: 42, height: 42, fontSize: 18,
-          cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >📍</button>
+      <button className="gps-fab" onClick={() => startGPS()} title="Meu GPS">📍</button>
     </div>
   );
 }
