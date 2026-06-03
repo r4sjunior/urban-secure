@@ -24,8 +24,17 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(req.body),
     });
-    const data = await heliusRes.json();
-    return res.status(heliusRes.status).json(data);
+
+    const text = await heliusRes.text();
+
+    // Se o Helius retornar erro de auth/limite, loga para diagnóstico
+    if (!heliusRes.ok) {
+      console.error('[/api/rpc] Helius status', heliusRes.status, text.slice(0, 200));
+    }
+
+    // Repassa a resposta crua (JSON-RPC) com o mesmo status
+    res.setHeader('Content-Type', 'application/json');
+    return res.status(heliusRes.status).send(text);
   } catch (err) {
     console.error('[/api/rpc]', err.message);
     return res.status(500).json({ error: 'Erro no RPC.' });
