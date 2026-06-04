@@ -79,21 +79,46 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
 
   const mintSigner = generateSigner(umi);
 
+  // Busca um blockhash FRESCO com commitment 'finalized' (mais durável
+  // que 'confirmed' — dá mais tempo até o block height ser excedido)
+  const blockhash = await umi.rpc.getLatestBlockhash({ commitment: 'finalized' });
+
   let builder = createNft(umi, {
     mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
     sellerFeeBasisPoints: percentAmount(5), isMutable: true,
   });
 
-  // Taxa de prioridade — acelera a inclusão da transação no bloco,
-  // evitando que o blockhash expire (block height exceeded)
+  // Taxa de prioridade — acelera inclusão no bloco
   try {
-    builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 100000 }));
-  } catch { /* mpl-toolbox pode não exportar — segue sem priority fee */ }
+    builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 }));
+  } catch {}
 
-  await builder.sendAndConfirm(umi, {
-    confirm: { commitment: 'confirmed' },
-    send:    { skipPreflight: true, maxRetries: 5 },
-  });
+  // Fixa o blockhash fresco no builder
+  builder = builder.setBlockhash(blockhash);
+
+  // Envia e confirma com a janela completa do blockhash
+  try {
+    await builder.sendAndConfirm(umi, {
+      confirm: { commitment: 'confirmed', strategy: { type: 'blockhash', ...blockhash } },
+      send:    { skipPreflight: true, maxRetries: 5, commitment: 'confirmed' },
+    });
+  } catch (err) {
+    // Se deu "block height exceeded", a transação pode ter confirmado
+    // mesmo assim. Espera e verifica se o NFT existe on-chain.
+    const msg = String(err?.message || '');
+    if (msg.includes('expired') || msg.includes('block height')) {
+      await new Promise(r => setTimeout(r, 8000)); // espera propagar
+      try {
+        const { fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
+        await fetchDigitalAsset(umi, mintSigner.publicKey);
+        // Se não lançou erro, o NFT EXISTE — mint funcionou!
+        return mintSigner.publicKey.toString();
+      } catch {
+        throw new Error('A confirmação demorou. Verifique sua carteira — pode ter funcionado. Se não aparecer, tente de novo.');
+      }
+    }
+    throw err;
+  }
 
   return mintSigner.publicKey.toString();
 }
