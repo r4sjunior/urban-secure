@@ -72,15 +72,28 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
   const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
   const { mplTokenMetadata, createNft } = await import('@metaplex-foundation/mpl-token-metadata');
   const { generateSigner, percentAmount } = await import('@metaplex-foundation/umi');
+  const { setComputeUnitPrice } = await import('@metaplex-foundation/mpl-toolbox');
 
   const rpcUrl = `${window.location.origin}/api/rpc`;
   const umi = createUmi(rpcUrl).use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
 
   const mintSigner = generateSigner(umi);
-  await createNft(umi, {
+
+  let builder = createNft(umi, {
     mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
     sellerFeeBasisPoints: percentAmount(5), isMutable: true,
-  }).sendAndConfirm(umi, { confirm: { commitment: 'confirmed' }, send: { skipPreflight: false, maxRetries: 3 } });
+  });
+
+  // Taxa de prioridade — acelera a inclusão da transação no bloco,
+  // evitando que o blockhash expire (block height exceeded)
+  try {
+    builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 100000 }));
+  } catch { /* mpl-toolbox pode não exportar — segue sem priority fee */ }
+
+  await builder.sendAndConfirm(umi, {
+    confirm: { commitment: 'confirmed' },
+    send:    { skipPreflight: true, maxRetries: 5 },
+  });
 
   return mintSigner.publicKey.toString();
 }
