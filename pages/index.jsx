@@ -79,6 +79,9 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
 
   const mintSigner = generateSigner(umi);
 
+  // Carteira de quem está mintando — o NFT vai EXPLICITAMENTE para ela
+  const ownerPublicKey = umi.identity.publicKey;
+
   // Busca um blockhash FRESCO com commitment 'finalized' (mais durável
   // que 'confirmed' — dá mais tempo até o block height ser excedido)
   const blockhash = await umi.rpc.getLatestBlockhash({ commitment: 'finalized' });
@@ -86,6 +89,7 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
   let builder = createNft(umi, {
     mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
     sellerFeeBasisPoints: percentAmount(5), isMutable: true,
+    tokenOwner: ownerPublicKey,   // garante que o NFT vai pra carteira do minter
   });
 
   // Taxa de prioridade — acelera inclusão no bloco
