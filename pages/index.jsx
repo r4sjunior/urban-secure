@@ -70,7 +70,7 @@ function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, arti
 async function mintUrbanArt({ wallet, metadataUri, name }) {
   const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
   const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
-  const { mplTokenMetadata, createNft } = await import('@metaplex-foundation/mpl-token-metadata');
+  const { mplTokenMetadata, createNft, fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
   const { generateSigner, percentAmount } = await import('@metaplex-foundation/umi');
   const { setComputeUnitPrice } = await import('@metaplex-foundation/mpl-toolbox');
 
@@ -78,53 +78,50 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
   const umi = createUmi(rpcUrl).use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
 
   const mintSigner = generateSigner(umi);
-
-  // Carteira de quem está mintando — o NFT vai EXPLICITAMENTE para ela
   const ownerPublicKey = umi.identity.publicKey;
-
-  // Busca um blockhash FRESCO com commitment 'finalized' (mais durável
-  // que 'confirmed' — dá mais tempo até o block height ser excedido)
-  const blockhash = await umi.rpc.getLatestBlockhash({ commitment: 'finalized' });
 
   let builder = createNft(umi, {
     mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
     sellerFeeBasisPoints: percentAmount(5), isMutable: true,
-    tokenOwner: ownerPublicKey,   // garante que o NFT vai pra carteira do minter
+    tokenOwner: ownerPublicKey,
   });
 
   // Taxa de prioridade — acelera inclusão no bloco
-  try {
-    builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 }));
-  } catch {}
+  try { builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 })); } catch {}
 
-  // Fixa o blockhash fresco no builder
-  builder = builder.setBlockhash(blockhash);
-
-  // Envia e confirma com a janela completa do blockhash
-  try {
-    await builder.sendAndConfirm(umi, {
-      confirm: { commitment: 'confirmed', strategy: { type: 'blockhash', ...blockhash } },
-      send:    { skipPreflight: true, maxRetries: 5, commitment: 'confirmed' },
-    });
-  } catch (err) {
-    // Se deu "block height exceeded", a transação pode ter confirmado
-    // mesmo assim. Espera e verifica se o NFT existe on-chain.
-    const msg = String(err?.message || '');
-    if (msg.includes('expired') || msg.includes('block height')) {
-      await new Promise(r => setTimeout(r, 8000)); // espera propagar
-      try {
-        const { fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
-        await fetchDigitalAsset(umi, mintSigner.publicKey);
-        // Se não lançou erro, o NFT EXISTE — mint funcionou!
-        return mintSigner.publicKey.toString();
-      } catch {
-        throw new Error('A confirmação demorou. Verifique sua carteira — pode ter funcionado. Se não aparecer, tente de novo.');
-      }
+  // Verifica se o NFT já existe on-chain (polling até 20s)
+  async function nftExiste() {
+    try { await fetchDigitalAsset(umi, mintSigner.publicKey); return true; }
+    catch { return false; }
+  }
+  async function aguardarConfirmacao(tentativas = 10) {
+    for (let i = 0; i < tentativas; i++) {
+      await new Promise(r => setTimeout(r, 2000)); // 2s entre checagens
+      if (await nftExiste()) return true;
     }
-    throw err;
+    return false;
   }
 
-  return mintSigner.publicKey.toString();
+  // Envia a transação. Se a confirmação automática falhar por timeout,
+  // fazemos polling manual — porque o NFT frequentemente confirma depois.
+  try {
+    await builder.sendAndConfirm(umi, {
+      confirm: { commitment: 'confirmed' },
+      send:    { skipPreflight: true, maxRetries: 5, commitment: 'confirmed' },
+    });
+    // Sucesso direto
+    return mintSigner.publicKey.toString();
+  } catch (err) {
+    const msg = String(err?.message || '');
+    // Erros que NÃO são timeout → falha real, repassa
+    if (msg.includes('insufficient') || msg.includes('rejected') || msg.includes('0x1')) {
+      throw err;
+    }
+    // Timeout / blockhash expirado → verifica de verdade se foi mintado
+    const ok = await aguardarConfirmacao(10); // até ~20s
+    if (ok) return mintSigner.publicKey.toString();
+    throw new Error('Não foi possível confirmar o mint. Tente novamente.');
+  }
 }
 
 export default function Home() {

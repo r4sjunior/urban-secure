@@ -404,3 +404,16 @@ body {
   .sheet.open .sheet-panel { transform: translateX(-50%) translateY(0); }
   .search-float { max-width: 360px; }
 }
+
+/* ── Wallet conectada + desconectar ── */
+.wallet-connected {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+}
+.wallet-disconnect {
+  padding: 8px 14px; border-radius: 12px;
+  background: rgba(255,61,113,0.12); border: 1px solid var(--pink);
+  color: var(--pink); font-family: 'Outfit'; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.wallet-disconnect:active { transform: scale(0.95); }
+.wallet-connected .wallet-badge { flex: 1; }
