@@ -201,7 +201,17 @@ export default function Home() {
         solscanUrl: `https://solscan.io/token/${mintAddress}${network==='devnet'?'?cluster=devnet':''}`,
       });
       setMintStep('success');
-      addArt({ id: mintAddress, name: nftName, artistName: nome, description: descricao, lat: gps.lat, lng: gps.lng, imageUrl: imageUri, artistWallet, timestamp: Date.now() });
+      const novaArte = { id: mintAddress, name: nftName, artistName: nome, description: descricao, lat: gps.lat, lng: gps.lng, imageUrl: imageUri, artistWallet, timestamp: Date.now() };
+      addArt(novaArte);
+
+      // Registra no índice do Pinata para que TODOS vejam (contorna devnet)
+      try {
+        await fetch('/api/registry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(novaArte),
+        });
+      } catch (e) { console.error('[registry]', e); }
     } catch (err) {
       console.error('[handleMint]', err);
       let msg = err.message || 'Erro desconhecido.';
