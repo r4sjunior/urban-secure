@@ -4,6 +4,10 @@
  * HELIUS_API_KEY fica no servidor.
  */
 
+export const config = {
+  api: { bodyParser: { sizeLimit: '4mb' } },
+};
+
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
@@ -18,21 +22,26 @@ export default async function handler(req, res) {
   const cluster = network === 'mainnet-beta' ? 'mainnet' : 'devnet';
   const url     = `https://${cluster}.helius-rpc.com/?api-key=${apiKey}`;
 
+  // Reconstrói o body de forma defensiva (objeto OU string)
+  let bodyStr;
+  try {
+    bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  } catch {
+    return res.status(400).json({ error: 'Body inválido.' });
+  }
+
   try {
     const heliusRes = await fetch(url, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(req.body),
+      body:    bodyStr,
     });
 
     const text = await heliusRes.text();
-
-    // Se o Helius retornar erro de auth/limite, loga para diagnóstico
     if (!heliusRes.ok) {
-      console.error('[/api/rpc] Helius status', heliusRes.status, text.slice(0, 200));
+      console.error('[/api/rpc] Helius', heliusRes.status, text.slice(0, 200));
     }
 
-    // Repassa a resposta crua (JSON-RPC) com o mesmo status
     res.setHeader('Content-Type', 'application/json');
     return res.status(heliusRes.status).send(text);
   } catch (err) {

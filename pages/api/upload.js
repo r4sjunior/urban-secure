@@ -1,85 +1,66 @@
 /**
  * pages/api/upload.js
- * Proxy server-side para o Pinata — JWT nunca exposto no browser.
+ * Proxy Pinata — JWT no servidor. Recebe base64 JSON (confiável).
  */
 
 export const config = {
-  api: { bodyParser: false },
+  api: { bodyParser: { sizeLimit: '12mb' } },
 };
 
 export default async function handler(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const jwt = process.env.PINATA_JWT;
-  if (!jwt) {
-    return res.status(500).json({ error: 'PINATA_JWT não configurado.' });
-  }
+  if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
 
   try {
-    const contentType = req.headers['content-type'] || '';
+    const { type, data, filename, mime } = req.body || {};
 
-    // ── Upload de arquivo (imagem) ─────────────────────────
-    if (contentType.includes('multipart/form-data')) {
-      // Lê o body completo em buffer antes de reenviar
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      const buffer = Buffer.concat(chunks);
+    if (type === 'image') {
+      if (!data) return res.status(400).json({ error: 'Imagem ausente.' });
+      const base64 = data.includes(',') ? data.split(',')[1] : data;
+      const buffer = Buffer.from(base64, 'base64');
 
-      const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      const form = new FormData();
+      const blob = new Blob([buffer], { type: mime || 'image/jpeg' });
+      form.append('file', blob, filename || 'arte.jpg');
+
+      const r = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${jwt}`,
-          'Content-Type': contentType, // preserva o boundary do multipart
-        },
-        body:   buffer,
-        duplex: 'half', // necessário no Next.js 15
+        headers: { Authorization: `Bearer ${jwt}` },
+        body:    form,
       });
-
-      if (!pinataRes.ok) {
-        const err = await pinataRes.text();
-        return res.status(502).json({ error: `Pinata: ${err}` });
+      if (!r.ok) {
+        const detail = await r.text();
+        console.error('[/api/upload] file', r.status, detail);
+        return res.status(502).json({ error: `Pinata ${r.status}: ${detail.slice(0, 200)}` });
       }
-
-      const { IpfsHash } = await pinataRes.json();
-      return res.status(200).json({
-        url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}`,
-      });
+      const { IpfsHash } = await r.json();
+      return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}` });
     }
 
-    // ── Upload de JSON (metadados) ─────────────────────────
-    if (contentType.includes('application/json')) {
-      const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
-      const body = Buffer.concat(chunks).toString();
-      const json = JSON.parse(body);
-
-      const pinataRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+    if (type === 'json') {
+      if (!data) return res.status(400).json({ error: 'Metadados ausentes.' });
+      const r = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
         method:  'POST',
-        headers: {
-          Authorization:  `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
-        },
-        body:   JSON.stringify({ pinataContent: json }),
-        duplex: 'half',
+        headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ pinataContent: data }),
       });
-
-      if (!pinataRes.ok) {
-        const err = await pinataRes.text();
-        return res.status(502).json({ error: `Pinata: ${err}` });
+      if (!r.ok) {
+        console.error('[/api/upload] json', r.status, await r.text());
+        return res.status(502).json({ error: 'Falha no upload dos metadados.' });
       }
-
-      const { IpfsHash } = await pinataRes.json();
-      return res.status(200).json({
-        url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}`,
-      });
+      const { IpfsHash } = await r.json();
+      return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}` });
     }
 
-    return res.status(400).json({ error: 'Content-Type não suportado.' });
-
+    return res.status(400).json({ error: 'Tipo inválido.' });
   } catch (err) {
-    console.error('[/api/upload]', err);
-    return res.status(500).json({ error: err.message });
+    console.error('[/api/upload]', err.message);
+    return res.status(500).json({ error: 'Erro interno no upload.' });
   }
 }
