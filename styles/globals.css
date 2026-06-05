@@ -417,3 +417,31 @@ body {
 }
 .wallet-disconnect:active { transform: scale(0.95); }
 .wallet-connected .wallet-badge { flex: 1; }
+
+/* ── Botões de upload (câmera / galeria) ── */
+.upload-btns {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.upload-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Outfit'; font-size: 13px; font-weight: 600;
+  transition: border-color 0.2s, background 0.2s;
+}
+.upload-btn:active { border-color: var(--green); background: rgba(61,255,136,0.08); }
+
+/* ── Tip e links no sucesso do mint ── */
+.ov-tip {
+  font-size: 12px; color: var(--muted); line-height: 1.5;
+  background: rgba(255,255,255,0.04); border-radius: 12px;
+  padding: 12px; margin-bottom: 12px;
+}
+.ov-tip strong { color: var(--text); }
+.ov-tip em { color: var(--green); font-style: normal; font-weight: 600; }
+.ov-links { display: flex; gap: 8px; margin-bottom: 14px; }
+.ov-links a {
+  flex: 1; text-align: center; padding: 10px; border-radius: 12px;
+  background: rgba(139,92,246,0.12); border: 1px solid var(--violet);
+  color: #c4b5fd; text-decoration: none; font-size: 13px; font-weight: 700;
+}

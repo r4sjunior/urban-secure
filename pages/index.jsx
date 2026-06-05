@@ -282,10 +282,20 @@ export default function Home() {
             <h2 className="sheet-title">Registrar Arte Urbana</h2>
             <p className="sheet-sub">Sua obra vira um NFT na Solana, na sua carteira.</p>
 
-            <label className="upload-zone" style={{ backgroundImage: imagePreview ? `url(${imagePreview})` : 'none' }}>
-              {!imagePreview && <><span className="upload-ico">📷</span><span>Tirar foto / escolher</span></>}
-              <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isMinting} hidden />
-            </label>
+            <div className="upload-zone" style={{ backgroundImage: imagePreview ? `url(${imagePreview})` : 'none' }}>
+              {!imagePreview && <span className="upload-ico">📷</span>}
+              {!imagePreview && <span>Escolha uma opção abaixo</span>}
+            </div>
+            <div className="upload-btns">
+              <label className="upload-btn">
+                📸 Tirar foto
+                <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isMinting} hidden />
+              </label>
+              <label className="upload-btn">
+                🖼️ Galeria
+                <input type="file" accept="image/*" onChange={handleImageChange} disabled={isMinting} hidden />
+              </label>
+            </div>
 
             <input className="fld" placeholder="Nome do artista" value={nome} onChange={e=>setNome(e.target.value)} maxLength={50} disabled={isMinting} />
             <textarea className="fld" placeholder="Descrição da obra" value={descricao} onChange={e=>setDescricao(e.target.value)} rows={2} maxLength={200} disabled={isMinting} />
@@ -305,6 +315,7 @@ export default function Home() {
           visible={isMinting || mintStep === 'success'}
           step={mintStep}
           error={null}
+          result={mintResult}
           onDismiss={handleOverlayDismiss}
         />
       </div>
