@@ -10,6 +10,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const [lightbox, setLightbox] = useState(null); // url da imagem ampliada
   const circleRef = useRef(null);
   const artMarkersRef = useRef([]);
   const activeRef = useRef(false);
@@ -55,33 +56,50 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     artMarkersRef.current = [];
 
     const COLORS = ['#FF3D71', '#FFD23F', '#3DFF88'];
+    const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 
     arts.forEach((art, i) => {
       const color = COLORS[i % COLORS.length];
+      const safeImg = (art.imageUrl||'').startsWith('https://') ? escapeHtml(art.imageUrl) : '';
+
+      // Pino com a MINIATURA da arte dentro (ou 🎨 se sem imagem)
       const icon = L.divIcon({
         className: '',
         html: `<div class="art-pin" style="--pc:${color}">
-          <div class="art-pin-body"><span>🎨</span></div>
+          <div class="art-pin-body">
+            ${safeImg ? `<img src="${safeImg}" class="art-pin-img" onerror="this.parentNode.innerHTML='<span>🎨</span>'"/>` : '<span>🎨</span>'}
+          </div>
           <div class="art-pin-shadow"></div>
         </div>`,
-        iconSize: [40,48], iconAnchor: [20,46], popupAnchor: [0,-44],
+        iconSize: [46,56], iconAnchor: [23,54], popupAnchor: [0,-52],
       });
 
-      const safeImg = (art.imageUrl||'').startsWith('https://') ? escapeHtml(art.imageUrl) : '';
       const safeName = escapeHtml(art.name);
       const safeDesc = escapeHtml(art.description);
       const safeArtist = escapeHtml(art.artistName || '');
+      const solscanUrl = `https://solscan.io/token/${escapeHtml(art.id)}${network==='devnet'?'?cluster=devnet':''}`;
 
       const popup = `<div class="art-popup">
-        ${safeImg ? `<img src="${safeImg}" onerror="this.style.display='none'"/>` : ''}
+        ${safeImg ? `<img src="${safeImg}" class="art-popup-img" data-full="${safeImg}" onerror="this.style.display='none'"/>` : ''}
         <strong>${safeName}</strong>
         ${safeArtist ? `<em>por ${safeArtist}</em>` : ''}
         <span>${safeDesc}</span>
+        <a href="${solscanUrl}" target="_blank" rel="noreferrer" class="art-popup-link">🔗 Ver no Solscan</a>
       </div>`;
 
       const marker = L.marker([art.lat, art.lng], { icon })
-        .addTo(mapRef.current).bindPopup(popup, { maxWidth: 220, className: 'art-popup-wrap' });
+        .addTo(mapRef.current).bindPopup(popup, { maxWidth: 240, className: 'art-popup-wrap' });
       artMarkersRef.current.push(marker);
+    });
+
+    // Ao abrir um popup, conecta o clique na imagem para expandir (lightbox)
+    mapRef.current.off('popupopen');
+    mapRef.current.on('popupopen', (e) => {
+      const img = e.popup?.getElement()?.querySelector('.art-popup-img');
+      if (img) {
+        img.style.cursor = 'zoom-in';
+        img.onclick = () => setLightbox(img.getAttribute('data-full'));
+      }
     });
   }, [arts]);
 
@@ -135,6 +153,14 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
         </div>
       )}
       <button className="gps-fab" onClick={() => startGPS()} title="Meu GPS">📍</button>
+
+      {/* Lightbox — imagem ampliada ao clicar na miniatura */}
+      {lightbox && (
+        <div className="lightbox" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="Arte" onClick={(e) => e.stopPropagation()} />
+          <button className="lightbox-close" onClick={() => setLightbox(null)}>✕</button>
+        </div>
+      )}
     </div>
   );
 }
