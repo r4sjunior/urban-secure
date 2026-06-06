@@ -8,6 +8,7 @@ import { resizeImage } from '../lib/resizeImage';
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
 const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
+const TransferModal= dynamic(() => import('../components/TransferModal'),{ ssr: false });
 
 const STEPS = [
   { key: 'upload-image', label: 'Enviando imagem',   icon: '🖼️' },
@@ -135,6 +136,7 @@ export default function Home() {
   const [gps, setGps] = useState(null);
   const [busca, setBusca] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const [isMinting, setIsMinting] = useState(false);
   const [mintStep, setMintStep] = useState(null);
@@ -268,11 +270,17 @@ export default function Home() {
         {/* Dock inferior */}
         <nav className="dock">
           <div className="dock-wallet"><WalletHandler /></div>
+          {wallet.connected && (
+            <button className="dock-send" onClick={() => setTransferOpen(true)} title="Enviar arte">📤</button>
+          )}
           <button className="dock-cta" onClick={() => setSheetOpen(true)}>
             <span className="dock-cta-icon">＋</span>
             Registrar Arte
           </button>
         </nav>
+
+        {/* Modal de transferência */}
+        <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
 
         {/* Bottom sheet do formulário */}
         <div className={`sheet ${sheetOpen ? 'open' : ''}`}>

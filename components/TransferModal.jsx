@@ -1,0 +1,144 @@
+/**
+ * components/TransferModal.jsx
+ * Transfere um NFT URBAN da carteira conectada para outro endereço Solana.
+ * Usa o proxy RPC (Helius) — mais confiável que o envio pelo Phantom.
+ */
+import { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+
+export default function TransferModal({ open, onClose }) {
+  const wallet = useWallet();
+  const [nfts, setNfts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [destino, setDestino] = useState('');
+  const [status, setStatus] = useState(null); // null | 'sending' | 'ok' | erro string
+
+  // Carrega os NFTs URBAN da carteira conectada
+  useEffect(() => {
+    if (!open || !wallet.publicKey) return;
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
+        const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
+        const { mplTokenMetadata, fetchAllDigitalAssetWithTokenByOwner } = await import('@metaplex-foundation/mpl-token-metadata');
+
+        const umi = createUmi(`${window.location.origin}/api/rpc`)
+          .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
+
+        const assets = await fetchAllDigitalAssetWithTokenByOwner(umi, wallet.publicKey);
+        const urban = assets
+          .filter(a => (a.metadata.symbol || '').trim() === 'URBAN')
+          .map(a => ({ id: a.publicKey.toString(), name: a.metadata.name, uri: a.metadata.uri }));
+        if (!cancel) setNfts(urban);
+      } catch (err) {
+        console.error('[Transfer] load', err);
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [open, wallet.publicKey]);
+
+  function validarEndereco(addr) {
+    // Endereço Solana: base58, 32-44 chars
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr.trim());
+  }
+
+  async function handleTransfer() {
+    if (!selected) return setStatus('Selecione uma arte.');
+    if (!validarEndereco(destino)) return setStatus('Endereço Solana inválido.');
+
+    setStatus('sending');
+    try {
+      const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
+      const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
+      const { mplTokenMetadata, transferV1, fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
+      const { publicKey } = await import('@metaplex-foundation/umi');
+
+      const umi = createUmi(`${window.location.origin}/api/rpc`)
+        .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
+
+      const asset = await fetchDigitalAsset(umi, publicKey(selected));
+
+      await transferV1(umi, {
+        mint: publicKey(selected),
+        authority: umi.identity,
+        tokenOwner: umi.identity.publicKey,
+        destinationOwner: publicKey(destino.trim()),
+        tokenStandard: asset.metadata.tokenStandard?.__option === 'Some'
+          ? asset.metadata.tokenStandard.value
+          : 0, // 0 = NonFungible
+      }).sendAndConfirm(umi, {
+        confirm: { commitment: 'confirmed' },
+        send: { skipPreflight: true, maxRetries: 5 },
+      });
+
+      setStatus('ok');
+      setNfts(prev => prev.filter(n => n.id !== selected));
+      setSelected(null);
+      setDestino('');
+    } catch (err) {
+      console.error('[Transfer]', err);
+      let msg = err?.message || 'Erro ao transferir.';
+      if (msg.includes('insufficient')) msg = 'Saldo insuficiente para a taxa.';
+      else if (msg.includes('rejected')) msg = 'Transação cancelada.';
+      else msg = 'Falha ao transferir. Tente novamente.';
+      setStatus(msg);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="transfer-modal">
+      <div className="transfer-backdrop" onClick={() => status !== 'sending' && onClose()} />
+      <div className="transfer-panel">
+        <div className="sheet-handle" onClick={() => status !== 'sending' && onClose()} />
+        <h2 className="sheet-title">Enviar Arte</h2>
+        <p className="sheet-sub">Transfira um NFT para outra carteira Solana.</p>
+
+        {!wallet.connected ? (
+          <p className="transfer-empty">Conecte sua carteira primeiro.</p>
+        ) : loading ? (
+          <p className="transfer-empty">Carregando suas artes…</p>
+        ) : nfts.length === 0 ? (
+          <p className="transfer-empty">Você não tem artes URBAN nesta carteira.</p>
+        ) : (
+          <>
+            <div className="transfer-list">
+              {nfts.map(n => (
+                <button
+                  key={n.id}
+                  className={`transfer-item ${selected === n.id ? 'sel' : ''}`}
+                  onClick={() => { setSelected(n.id); setStatus(null); }}
+                >
+                  <span className="transfer-item-name">{n.name}</span>
+                  <span className="transfer-item-id">{n.id.slice(0,4)}…{n.id.slice(-4)}</span>
+                </button>
+              ))}
+            </div>
+
+            <input
+              className="fld"
+              placeholder="Endereço Solana do destinatário"
+              value={destino}
+              onChange={e => { setDestino(e.target.value); setStatus(null); }}
+              disabled={status === 'sending'}
+            />
+
+            {status === 'ok' && <div className="transfer-ok">✅ Arte enviada com sucesso!</div>}
+            {status && status !== 'sending' && status !== 'ok' && <div className="err-box">⚠️ {status}</div>}
+
+            <button className="mint-cta" onClick={handleTransfer} disabled={status === 'sending'}>
+              {status === 'sending' ? '⏳ Enviando…' : '📤 Enviar Arte'}
+            </button>
+            <p className="fee-note">Você paga apenas a taxa de gás (~0.001 SOL)</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
