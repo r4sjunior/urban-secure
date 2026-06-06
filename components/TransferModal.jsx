@@ -29,9 +29,18 @@ export default function TransferModal({ open, onClose }) {
           .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
 
         const assets = await fetchAllDigitalAssetWithTokenByOwner(umi, wallet.publicKey);
-        const urban = assets
-          .filter(a => (a.metadata.symbol || '').trim() === 'URBAN')
-          .map(a => ({ id: a.publicKey.toString(), name: a.metadata.name, uri: a.metadata.uri }));
+        const urbanAssets = assets.filter(a => (a.metadata.symbol || '').trim() === 'URBAN');
+
+        // Busca a imagem de cada NFT no metadata JSON (IPFS)
+        const urban = await Promise.all(urbanAssets.map(async (a) => {
+          let imageUrl = '';
+          try {
+            const res = await fetch(a.metadata.uri);
+            const json = await res.json();
+            imageUrl = (json.image || '').startsWith('https://') ? json.image : '';
+          } catch {}
+          return { id: a.publicKey.toString(), name: a.metadata.name, uri: a.metadata.uri, imageUrl };
+        }));
         if (!cancel) setNfts(urban);
       } catch (err) {
         console.error('[Transfer] load', err);
@@ -115,8 +124,16 @@ export default function TransferModal({ open, onClose }) {
                   className={`transfer-item ${selected === n.id ? 'sel' : ''}`}
                   onClick={() => { setSelected(n.id); setStatus(null); }}
                 >
-                  <span className="transfer-item-name">{n.name}</span>
-                  <span className="transfer-item-id">{n.id.slice(0,4)}…{n.id.slice(-4)}</span>
+                  <div className="transfer-item-thumb">
+                    {n.imageUrl
+                      ? <img src={n.imageUrl} alt="" onError={(e)=>{e.target.style.display='none';e.target.parentNode.textContent='🎨';}} />
+                      : '🎨'}
+                  </div>
+                  <div className="transfer-item-info">
+                    <span className="transfer-item-name">{n.name}</span>
+                    <span className="transfer-item-id">{n.id.slice(0,4)}…{n.id.slice(-4)}</span>
+                  </div>
+                  {selected === n.id && <span className="transfer-item-check">✓</span>}
                 </button>
               ))}
             </div>
