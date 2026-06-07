@@ -1,10 +1,9 @@
 /**
  * components/WalletHandler.jsx
- * Conexão de wallet — APENAS Phantom. Suporte a mobile (deep link) e desconectar.
+ * Conexão de wallet — APENAS Phantom. Controle explícito de connect/disconnect.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
 
 function isMobile() {
@@ -17,8 +16,9 @@ function phantomLink() {
 }
 
 export default function WalletHandler() {
-  const wallet = useWallet();
+  const { wallets, wallet, publicKey, connected, connecting, select, connect, disconnect } = useWallet();
   const [env, setEnv] = useState('unknown');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (inPhantom())  { setEnv('phantom-browser'); return; }
@@ -26,52 +26,87 @@ export default function WalletHandler() {
     setEnv('desktop');
   }, []);
 
+  // Listeners de erro
   useEffect(() => {
-    if (!wallet.wallets?.length) return;
-    const subs = wallet.wallets.map(w => {
-      const onErr = (e) => console.error(`[Wallet] ${w.adapter.name}:`, e?.message);
+    if (!wallets?.length) return;
+    const subs = wallets.map(w => {
+      const onErr = (e) => { console.error(`[Wallet] ${w.adapter.name}:`, e?.message); setBusy(false); };
       w.adapter.on('error', onErr);
       return () => w.adapter.off('error', onErr);
     });
     return () => subs.forEach(fn => fn());
-  }, [wallet.wallets]);
+  }, [wallets]);
 
-  // Auto-connect dentro do browser interno da Phantom
-  useEffect(() => {
-    if (wallet.connected) return;
-    if (env !== 'phantom-browser') return;
-    const found = wallet.wallets?.find(w => w.adapter.name === 'Phantom' && w.adapter.readyState === WalletReadyState.Installed);
-    if (found) {
-      wallet.select(found.adapter.name);
-      const t = setTimeout(() => wallet.connect().catch(e => console.error('[Wallet] auto:', e?.message)), 250);
-      return () => clearTimeout(t);
+  const phantomAdapter = wallets?.find(w => w.adapter.name === 'Phantom');
+  const phantomReady = phantomAdapter?.adapter.readyState === WalletReadyState.Installed
+                    || phantomAdapter?.adapter.readyState === WalletReadyState.Loadable;
+
+  // Conecta: seleciona Phantom e conecta explicitamente
+  const handleConnect = useCallback(async () => {
+    try {
+      setBusy(true);
+      // Se o Phantom não está injetado no browser, manda pro deep link
+      if (env === 'mobile' && !inPhantom() && !phantomReady) {
+        window.location.href = phantomLink();
+        return;
+      }
+      if (wallet?.adapter?.name !== 'Phantom') {
+        select('Phantom');
+        // espera o adapter ser selecionado antes de conectar
+        await new Promise(r => setTimeout(r, 300));
+      }
+      await connect();
+    } catch (e) {
+      console.error('[Wallet] connect:', e?.message);
+    } finally {
+      setBusy(false);
     }
-  }, [env, wallet.connected, wallet.wallets]);
+  }, [env, phantomReady, wallet, select, connect]);
 
-  if (wallet.connected) {
+  // Desconecta e limpa o estado salvo (evita auto-reconexão)
+  const handleDisconnect = useCallback(async () => {
+    try {
+      await disconnect();
+    } catch (e) {
+      console.error('[Wallet] disconnect:', e?.message);
+    } finally {
+      // Garante limpeza da chave persistida
+      try { localStorage.removeItem('urban-secure:wallet'); } catch {}
+    }
+  }, [disconnect]);
+
+  // Auto-connect só dentro do browser interno da Phantom
+  useEffect(() => {
+    if (connected || busy) return;
+    if (env !== 'phantom-browser') return;
+    if (!phantomReady) return;
+    select('Phantom');
+    const t = setTimeout(() => connect().catch(e => console.error('[Wallet] auto:', e?.message)), 300);
+    return () => clearTimeout(t);
+  }, [env, connected, phantomReady]);
+
+  // CONECTADO
+  if (connected && publicKey) {
     return (
       <div className="wallet-connected">
         <div className="wallet-badge">
           <span className="wallet-dot" />
-          <span className="wallet-pub">{wallet.publicKey?.toBase58().slice(0,4)}…{wallet.publicKey?.toBase58().slice(-4)}</span>
+          <span className="wallet-pub">{publicKey.toBase58().slice(0,4)}…{publicKey.toBase58().slice(-4)}</span>
         </div>
-        <button className="wallet-disconnect" onClick={() => wallet.disconnect()}>Sair</button>
+        <button className="wallet-disconnect" onClick={handleDisconnect}>Sair</button>
       </div>
     );
   }
 
-  // Mobile fora do app Phantom → deep link abre dentro da Phantom
-  if (env === 'mobile') {
-    const hasInjected = wallet.wallets?.some(w => w.adapter.readyState === WalletReadyState.Installed);
-    if (hasInjected) {
-      return <div style={{ position:'relative', zIndex:10 }}><WalletMultiButton /></div>;
-    }
-    return (
-      <div className="wallet-mobile">
-        <a href={phantomLink()} className="deeplink phantom">👻 Conectar Phantom</a>
-      </div>
-    );
+  // CONECTANDO
+  if (connecting || busy) {
+    return <button className="wallet-connect-btn" disabled>Conectando…</button>;
   }
 
-  return <div style={{ position:'relative', zIndex:10 }}><WalletMultiButton /></div>;
+  // DESCONECTADO → botão conectar
+  return (
+    <button className="wallet-connect-btn" onClick={handleConnect}>
+      👻 Conectar Phantom
+    </button>
+  );
 }
