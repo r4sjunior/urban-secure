@@ -66,29 +66,56 @@ export default function TransferModal({ open, onClose }) {
       const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
       const { mplTokenMetadata, transferV1, fetchDigitalAsset, TokenStandard } = await import('@metaplex-foundation/mpl-token-metadata');
       const { publicKey } = await import('@metaplex-foundation/umi');
+      const { setComputeUnitPrice } = await import('@metaplex-foundation/mpl-toolbox');
 
       const umi = createUmi(`${window.location.origin}/api/rpc`)
         .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
 
+      const destPk = publicKey(destino.trim());
       const asset = await fetchDigitalAsset(umi, publicKey(selected));
 
-      // Detecta o token standard real do NFT
       let ts = TokenStandard.NonFungible;
       const onChainTs = asset?.metadata?.tokenStandard;
-      if (onChainTs && onChainTs.__option === 'Some') {
-        ts = onChainTs.value;
+      if (onChainTs && onChainTs.__option === 'Some') ts = onChainTs.value;
+
+      // Verifica se o NFT já saiu da carteira (transferência confirmada)
+      async function jaTransferiu() {
+        try {
+          const { fetchAllDigitalAssetWithTokenByOwner } = await import('@metaplex-foundation/mpl-token-metadata');
+          const restantes = await fetchAllDigitalAssetWithTokenByOwner(umi, umi.identity.publicKey);
+          return !restantes.some(a => a.publicKey.toString() === selected);
+        } catch { return false; }
       }
 
-      await transferV1(umi, {
+      // Blockhash fresco 'finalized' (janela maior)
+      const blockhash = await umi.rpc.getLatestBlockhash({ commitment: 'finalized' });
+
+      let builder = transferV1(umi, {
         mint: publicKey(selected),
         authority: umi.identity,
         tokenOwner: umi.identity.publicKey,
-        destinationOwner: publicKey(destino.trim()),
+        destinationOwner: destPk,
         tokenStandard: ts,
-      }).sendAndConfirm(umi, {
-        confirm: { commitment: 'confirmed' },
-        send: { skipPreflight: true, maxRetries: 5 },
       });
+      try { builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 })); } catch {}
+      builder = builder.setBlockhash(blockhash);
+
+      try {
+        await builder.sendAndConfirm(umi, {
+          confirm: { commitment: 'confirmed' },
+          send: { skipPreflight: true, maxRetries: 5 },
+        });
+      } catch (errSend) {
+        const m = String(errSend?.message || '');
+        if (m.includes('expired') || m.includes('block height')) {
+          // Pode ter confirmado mesmo assim — verifica
+          await new Promise(r => setTimeout(r, 8000));
+          const ok = await jaTransferiu();
+          if (!ok) throw new Error('A confirmação demorou. Verifique sua carteira antes de tentar de novo.');
+        } else {
+          throw errSend;
+        }
+      }
 
       setStatus('ok');
       setNfts(prev => prev.filter(n => n.id !== selected));
@@ -99,7 +126,8 @@ export default function TransferModal({ open, onClose }) {
       let msg = err?.message || 'Erro ao transferir.';
       if (msg.includes('insufficient')) msg = 'Saldo insuficiente para a taxa.';
       else if (msg.includes('rejected') || msg.includes('User rejected')) msg = 'Transação cancelada.';
-      else msg = `Erro: ${msg.slice(0, 150)}`; // mostra erro real p/ diagnóstico
+      else if (msg.includes('confirmação demorou')) msg = msg; // mantém mensagem clara
+      else msg = `Erro: ${msg.slice(0, 150)}`;
       setStatus(msg);
     }
   }
