@@ -545,3 +545,34 @@ body {
 }
 .wallet-connect-btn:active { transform: scale(0.97); }
 .wallet-connect-btn:disabled { opacity: 0.6; cursor: wait; }
+
+/* ── Wrapper do WalletMultiButton oficial ── */
+.wallet-btn-wrap { width: 100%; position: relative; z-index: 10; }
+.wallet-btn-wrap .wallet-adapter-button {
+  width: 100% !important; height: 44px !important;
+  justify-content: center !important; border-radius: 14px !important;
+  background: rgba(139,92,246,0.15) !important; border: 1px solid var(--violet) !important;
+  color: #c4b5fd !important; font-family: 'Outfit' !important; font-weight: 700 !important;
+  font-size: 13px !important; padding: 0 16px !important;
+}
+.wallet-btn-wrap .wallet-adapter-button:not([disabled]):hover {
+  background: rgba(139,92,246,0.25) !important;
+}
+
+/* ── Modal de seleção de wallet — SEMPRE por cima de tudo ── */
+.wallet-adapter-modal-overlay {
+  z-index: 99998 !important;
+  background: rgba(0,0,0,0.7) !important;
+}
+.wallet-adapter-modal-wrapper {
+  z-index: 99999 !important;
+  background: var(--bg-2) !important;
+  border: 1px solid var(--border) !important;
+}
+.wallet-adapter-modal-container { z-index: 99999 !important; }
+.wallet-adapter-modal-title { color: var(--text) !important; }
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: rgba(139,92,246,0.15) !important;
+  color: #c4b5fd !important;
+}
+.wallet-adapter-modal-list-more { color: var(--muted) !important; }

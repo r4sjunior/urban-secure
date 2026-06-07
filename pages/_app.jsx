@@ -17,7 +17,7 @@ function Providers({ children }) {
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider
         wallets={wallets}
-        autoConnect={false}
+        autoConnect
         localStorageKey="urban-secure:wallet"
         onError={(e) => console.error('[WalletProvider]', e?.message, e?.error?.message)}
       >

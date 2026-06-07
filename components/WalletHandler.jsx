@@ -1,10 +1,10 @@
 /**
  * components/WalletHandler.jsx
- * Conexão de wallet — APENAS Phantom. Controle explícito de connect/disconnect.
+ * Conexão de wallet via WalletMultiButton oficial (robusto) + desconexão limpa.
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletReadyState } from '@solana/wallet-adapter-base';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 function isMobile() {
   if (typeof window === 'undefined') return false;
@@ -16,76 +16,21 @@ function phantomLink() {
 }
 
 export default function WalletHandler() {
-  const { wallets, wallet, publicKey, connected, connecting, select, connect, disconnect } = useWallet();
-  const [env, setEnv] = useState('unknown');
-  const [busy, setBusy] = useState(false);
+  const { publicKey, connected, disconnect, wallet } = useWallet();
+  const [isMobileBrowser, setIsMobileBrowser] = useState(false);
 
   useEffect(() => {
-    if (inPhantom())  { setEnv('phantom-browser'); return; }
-    if (isMobile())   { setEnv('mobile');          return; }
-    setEnv('desktop');
+    // Mobile fora do app Phantom (sem wallet injetada) → precisa de deep link
+    setIsMobileBrowser(isMobile() && !inPhantom());
   }, []);
 
-  // Listeners de erro
-  useEffect(() => {
-    if (!wallets?.length) return;
-    const subs = wallets.map(w => {
-      const onErr = (e) => { console.error(`[Wallet] ${w.adapter.name}:`, e?.message); setBusy(false); };
-      w.adapter.on('error', onErr);
-      return () => w.adapter.off('error', onErr);
-    });
-    return () => subs.forEach(fn => fn());
-  }, [wallets]);
+  async function handleDisconnect() {
+    try { await disconnect(); }
+    catch (e) { console.error('[Wallet] disconnect:', e?.message); }
+    finally { try { localStorage.removeItem('urban-secure:wallet'); } catch {} }
+  }
 
-  const phantomAdapter = wallets?.find(w => w.adapter.name === 'Phantom');
-  const phantomReady = phantomAdapter?.adapter.readyState === WalletReadyState.Installed
-                    || phantomAdapter?.adapter.readyState === WalletReadyState.Loadable;
-
-  // Conecta: seleciona Phantom e conecta explicitamente
-  const handleConnect = useCallback(async () => {
-    try {
-      setBusy(true);
-      // Se o Phantom não está injetado no browser, manda pro deep link
-      if (env === 'mobile' && !inPhantom() && !phantomReady) {
-        window.location.href = phantomLink();
-        return;
-      }
-      if (wallet?.adapter?.name !== 'Phantom') {
-        select('Phantom');
-        // espera o adapter ser selecionado antes de conectar
-        await new Promise(r => setTimeout(r, 300));
-      }
-      await connect();
-    } catch (e) {
-      console.error('[Wallet] connect:', e?.message);
-    } finally {
-      setBusy(false);
-    }
-  }, [env, phantomReady, wallet, select, connect]);
-
-  // Desconecta e limpa o estado salvo (evita auto-reconexão)
-  const handleDisconnect = useCallback(async () => {
-    try {
-      await disconnect();
-    } catch (e) {
-      console.error('[Wallet] disconnect:', e?.message);
-    } finally {
-      // Garante limpeza da chave persistida
-      try { localStorage.removeItem('urban-secure:wallet'); } catch {}
-    }
-  }, [disconnect]);
-
-  // Auto-connect só dentro do browser interno da Phantom
-  useEffect(() => {
-    if (connected || busy) return;
-    if (env !== 'phantom-browser') return;
-    if (!phantomReady) return;
-    select('Phantom');
-    const t = setTimeout(() => connect().catch(e => console.error('[Wallet] auto:', e?.message)), 300);
-    return () => clearTimeout(t);
-  }, [env, connected, phantomReady]);
-
-  // CONECTADO
+  // Conectado → mostra endereço + Sair
   if (connected && publicKey) {
     return (
       <div className="wallet-connected">
@@ -98,15 +43,19 @@ export default function WalletHandler() {
     );
   }
 
-  // CONECTANDO
-  if (connecting || busy) {
-    return <button className="wallet-connect-btn" disabled>Conectando…</button>;
+  // Mobile sem Phantom injetado → deep link abre o app Phantom com o site dentro
+  if (isMobileBrowser) {
+    return (
+      <a href={phantomLink()} className="wallet-connect-btn" style={{ textDecoration:'none' }}>
+        👻 Abrir no Phantom
+      </a>
+    );
   }
 
-  // DESCONECTADO → botão conectar
+  // Desktop ou dentro do Phantom → botão oficial (gerencia connect/modal sozinho)
   return (
-    <button className="wallet-connect-btn" onClick={handleConnect}>
-      👻 Conectar Phantom
-    </button>
+    <div className="wallet-btn-wrap">
+      <WalletMultiButton />
+    </div>
   );
 }
