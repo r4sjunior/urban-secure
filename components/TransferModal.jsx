@@ -126,8 +126,9 @@ export default function TransferModal({ open, onClose }) {
       let msg = err?.message || 'Erro ao transferir.';
       if (msg.includes('insufficient')) msg = 'Saldo insuficiente para a taxa.';
       else if (msg.includes('rejected') || msg.includes('User rejected')) msg = 'Transação cancelada.';
-      else if (msg.includes('confirmação demorou')) msg = msg; // mantém mensagem clara
-      else msg = `Erro: ${msg.slice(0, 150)}`;
+      else if (msg.includes('confirmação demorou')) msg = msg;
+      else if (msg.includes('expired') || msg.includes('block height')) msg = 'A rede demorou a confirmar. Verifique sua carteira antes de tentar de novo.';
+      else msg = 'Não foi possível transferir. Tente novamente.';
       setStatus(msg);
     }
   }

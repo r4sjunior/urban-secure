@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       if (!r.ok) {
         const detail = await r.text();
         console.error('[/api/upload] file', r.status, detail);
-        return res.status(502).json({ error: `Pinata ${r.status}: ${detail.slice(0, 200)}` });
+        return res.status(502).json({ error: 'Falha no upload da imagem.' });
       }
       const { IpfsHash } = await r.json();
       return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}` });

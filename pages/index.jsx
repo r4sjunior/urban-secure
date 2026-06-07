@@ -219,8 +219,8 @@ export default function Home() {
       let msg = err.message || 'Erro desconhecido.';
       if (msg.includes('insufficient') || msg.includes('0x1')) msg = 'Saldo insuficiente. Pegue SOL em faucet.solana.com';
       else if (msg.includes('rejected')) msg = 'Transação cancelada na carteira.';
-      // Mostra o erro real temporariamente para diagnóstico
-      else msg = `Mint: ${msg.slice(0, 180)}`;
+      else if (msg.includes('expired') || msg.includes('block height') || msg.includes('blockhash')) msg = 'A rede demorou a confirmar. Verifique sua carteira ou tente de novo.';
+      else msg = 'Não foi possível mintar. Tente novamente.';
       setMintError(msg); setMintStep(null);
     } finally { setIsMinting(false); }
   };
