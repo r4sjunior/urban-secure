@@ -64,7 +64,7 @@ export default function TransferModal({ open, onClose }) {
     try {
       const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
       const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
-      const { mplTokenMetadata, transferV1, fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
+      const { mplTokenMetadata, transferV1, fetchDigitalAsset, TokenStandard } = await import('@metaplex-foundation/mpl-token-metadata');
       const { publicKey } = await import('@metaplex-foundation/umi');
 
       const umi = createUmi(`${window.location.origin}/api/rpc`)
@@ -72,14 +72,19 @@ export default function TransferModal({ open, onClose }) {
 
       const asset = await fetchDigitalAsset(umi, publicKey(selected));
 
+      // Detecta o token standard real do NFT
+      let ts = TokenStandard.NonFungible;
+      const onChainTs = asset?.metadata?.tokenStandard;
+      if (onChainTs && onChainTs.__option === 'Some') {
+        ts = onChainTs.value;
+      }
+
       await transferV1(umi, {
         mint: publicKey(selected),
         authority: umi.identity,
         tokenOwner: umi.identity.publicKey,
         destinationOwner: publicKey(destino.trim()),
-        tokenStandard: asset.metadata.tokenStandard?.__option === 'Some'
-          ? asset.metadata.tokenStandard.value
-          : 0, // 0 = NonFungible
+        tokenStandard: ts,
       }).sendAndConfirm(umi, {
         confirm: { commitment: 'confirmed' },
         send: { skipPreflight: true, maxRetries: 5 },
@@ -90,11 +95,11 @@ export default function TransferModal({ open, onClose }) {
       setSelected(null);
       setDestino('');
     } catch (err) {
-      console.error('[Transfer]', err);
+      console.error('[Transfer] erro completo:', err);
       let msg = err?.message || 'Erro ao transferir.';
       if (msg.includes('insufficient')) msg = 'Saldo insuficiente para a taxa.';
-      else if (msg.includes('rejected')) msg = 'Transação cancelada.';
-      else msg = 'Falha ao transferir. Tente novamente.';
+      else if (msg.includes('rejected') || msg.includes('User rejected')) msg = 'Transação cancelada.';
+      else msg = `Erro: ${msg.slice(0, 150)}`; // mostra erro real p/ diagnóstico
       setStatus(msg);
     }
   }
