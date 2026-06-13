@@ -462,6 +462,26 @@ body {
   color: #c4b5fd; text-decoration: none; font-size: 12px; font-weight: 700;
 }
 
+/* ── Botão de Like Pago ── */
+.art-popup-like { margin-top: 8px; }
+.like-button-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.like-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 8px; border-radius: 10px;
+  background: rgba(255,61,113,0.12); border: 1px solid rgba(255,61,113,0.35);
+  color: #ffc4d3; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.like-btn:active { transform: scale(0.97); }
+.like-btn:disabled { opacity: 0.6; cursor: default; }
+.like-btn.liked { background: rgba(255,61,113,0.22); border-color: #FF3D71; color: #fff; }
+.like-price { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.like-error {
+  margin-top: 4px; font-size: 11px; color: #ffb4b4;
+  background: rgba(255,61,113,0.1); border-radius: 6px; padding: 4px 6px;
+  text-align: center;
+}
+
 /* ── Lightbox (imagem ampliada) ── */
 .lightbox {
   position: fixed; inset: 0; z-index: 3000;

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { useWallet } from '@solana/wallet-adapter-react';
+import LikeButton from './LikeButton';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -16,6 +19,10 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
   const activeRef = useRef(false);
   const watchRef = useRef(null);
   const firstFix = useRef(true);
+  const likeRootsRef = useRef(new Map()); // postId -> React root (LikeButton no popup)
+  const wallet = useWallet();
+  const walletRef = useRef(wallet);
+  walletRef.current = wallet;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -84,6 +91,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
         <strong>${safeName}</strong>
         ${safeArtist ? `<em>por ${safeArtist}</em>` : ''}
         <span>${safeDesc}</span>
+        <div class="art-popup-like" data-post-id="${escapeHtml(art.id)}" data-artist-wallet="${escapeHtml(art.artistWallet)}"></div>
         <a href="${solscanUrl}" target="_blank" rel="noreferrer" class="art-popup-link">🔗 Ver no Solscan</a>
       </div>`;
 
@@ -93,12 +101,37 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     });
 
     // Ao abrir um popup, conecta o clique na imagem para expandir (lightbox)
+    // e monta o LikeButton React dentro do container do popup.
     mapRef.current.off('popupopen');
+    mapRef.current.off('popupclose');
     mapRef.current.on('popupopen', (e) => {
-      const img = e.popup?.getElement()?.querySelector('.art-popup-img');
+      const el = e.popup?.getElement();
+      const img = el?.querySelector('.art-popup-img');
       if (img) {
         img.style.cursor = 'zoom-in';
         img.onclick = () => setLightbox(img.getAttribute('data-full'));
+      }
+
+      const likeContainer = el?.querySelector('.art-popup-like');
+      if (likeContainer) {
+        const postId = likeContainer.getAttribute('data-post-id');
+        const artistWallet = likeContainer.getAttribute('data-artist-wallet');
+        if (postId && artistWallet) {
+          const root = createRoot(likeContainer);
+          likeRootsRef.current.set(postId, root);
+          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} />);
+        }
+      }
+    });
+    mapRef.current.on('popupclose', (e) => {
+      const el = e.popup?.getElement();
+      const likeContainer = el?.querySelector('.art-popup-like');
+      const postId = likeContainer?.getAttribute('data-post-id');
+      if (postId && likeRootsRef.current.has(postId)) {
+        const root = likeRootsRef.current.get(postId);
+        // unmount assíncrono para evitar warning de unmount durante render
+        setTimeout(() => root.unmount(), 0);
+        likeRootsRef.current.delete(postId);
       }
     });
   }, [arts]);
