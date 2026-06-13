@@ -19,10 +19,16 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
   const activeRef = useRef(false);
   const watchRef = useRef(null);
   const firstFix = useRef(true);
-  const likeRootsRef = useRef(new Map()); // postId -> React root (LikeButton no popup)
+  const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
-  const walletRef = useRef(wallet);
-  walletRef.current = wallet;
+
+  // Sempre que o estado da wallet mudar (conectar/desconectar/trocar),
+  // re-renderiza qualquer LikeButton já montado em popup aberto.
+  useEffect(() => {
+    likeRootsRef.current.forEach(({ root, artistWallet, postId }) => {
+      root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} />);
+    });
+  }, [wallet]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -118,8 +124,8 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
         const artistWallet = likeContainer.getAttribute('data-artist-wallet');
         if (postId && artistWallet) {
           const root = createRoot(likeContainer);
-          likeRootsRef.current.set(postId, root);
-          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} />);
+          likeRootsRef.current.set(postId, { root, artistWallet, postId });
+          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} />);
         }
       }
     });
@@ -128,7 +134,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
       const likeContainer = el?.querySelector('.art-popup-like');
       const postId = likeContainer?.getAttribute('data-post-id');
       if (postId && likeRootsRef.current.has(postId)) {
-        const root = likeRootsRef.current.get(postId);
+        const { root } = likeRootsRef.current.get(postId);
         // unmount assíncrono para evitar warning de unmount durante render
         setTimeout(() => root.unmount(), 0);
         likeRootsRef.current.delete(postId);
