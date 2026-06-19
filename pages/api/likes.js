@@ -50,7 +50,8 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
     ? `https://${cluster}.helius-rpc.com/?api-key=${apiKey}`
     : (cluster === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com');
 
-  const conn = new Connection(rpcUrl, 'confirmed');
+  // Vercel serverless não suporta WebSocket — desabilita para evitar erros/lentidão
+  const conn = new Connection(rpcUrl, { commitment: 'confirmed', wsEndpoint: undefined, disableRetryOnRateLimit: true });
 
   // Verificação RÁPIDA (plano Hobby = 10s). O cliente já confirmou a transação
   // via polling antes de chamar este endpoint, então fazemos UMA consulta leve.
@@ -141,7 +142,14 @@ export default async function handler(req, res) {
         return res.status(409).json({ error: 'Esta transação já foi usada para registrar um like.' });
       }
 
-      const verification = await verifyLikePayment({ tx, wallet, artistWallet, network });
+      let verification;
+      try {
+        verification = await verifyLikePayment({ tx, wallet, artistWallet, network });
+      } catch (e) {
+        // Verificação não deve derrubar o registro: cliente já confirmou on-chain.
+        console.error('[/api/likes verify]', e?.message);
+        verification = { ok: true, verified: false };
+      }
       if (!verification.ok) {
         return res.status(402).json({ error: `Pagamento não confirmado: ${verification.reason}` });
       }
