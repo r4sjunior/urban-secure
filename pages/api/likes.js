@@ -61,35 +61,26 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
   if (!parsed) return { ok: false, reason: 'Transação não encontrada ou não confirmada.' };
   if (parsed.meta?.err) return { ok: false, reason: 'Transação falhou on-chain.' };
 
-  const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_LIKE_PRICE_SOL || '0.0003') * 1e9);
-  const feeWallet = process.env.URBAN_FEE_WALLET || process.env.NEXT_PUBLIC_URBAN_FEE_WALLET;
-  if (!feeWallet) return { ok: false, reason: 'Fee wallet não configurada no servidor.' };
-
-  const artistShare = Math.floor(priceLamports * 0.8);
-  const feeShare = priceLamports - artistShare;
+  // Valor total do like — deve ir INTEGRALMENTE para o artista (autor do NFT)
+  const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_LIKE_PRICE_SOL || '0.0028') * 1e9);
 
   const instructions = parsed.transaction.message.instructions || [];
   const signer = parsed.transaction.message.accountKeys?.find(k => k.signer)?.pubkey?.toString();
   if (signer !== wallet) return { ok: false, reason: 'Assinante da transação não corresponde à wallet.' };
 
   let paidArtist = 0;
-  let paidFee = 0;
 
   for (const ix of instructions) {
     if (ix.program !== 'system' || ix.parsed?.type !== 'transfer') continue;
     const info = ix.parsed.info;
     if (info.source !== wallet) continue;
     if (info.destination === artistWallet) paidArtist += Number(info.lamports);
-    if (info.destination === feeWallet) paidFee += Number(info.lamports);
   }
 
   // Tolerância mínima (lamports) para evitar falhas por arredondamento
   const TOL = 50;
-  if (paidArtist + TOL < artistShare) {
-    return { ok: false, reason: `Pagamento ao artista insuficiente (${paidArtist} < ${artistShare} lamports).` };
-  }
-  if (paidFee + TOL < feeShare) {
-    return { ok: false, reason: `Pagamento da taxa insuficiente (${paidFee} < ${feeShare} lamports).` };
+  if (paidArtist + TOL < priceLamports) {
+    return { ok: false, reason: `Pagamento ao artista insuficiente (${paidArtist} < ${priceLamports} lamports).` };
   }
 
   return { ok: true };
