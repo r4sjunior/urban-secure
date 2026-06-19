@@ -1,11 +1,25 @@
 /**
  * components/LikeButton.jsx
- * Botão de "like pago" — conecta wallet, assina pagamento (80/20),
+ * Botão de "like pago" — conecta wallet, assina pagamento (100% ao artista),
  * registra no backend e bloqueia múltiplos likes da mesma wallet.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { payForLike, getLikePriceSol } from '../lib/likePayment';
+
+// Lê a resposta com segurança: se o servidor devolver HTML (erro/timeout),
+// não quebra no JSON.parse — devolve uma mensagem tratável.
+async function safeJson(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (res.status === 504 || /timeout/i.test(text)) {
+      throw new Error('O servidor demorou para responder. Seu pagamento pode ter sido feito — verifique no Solscan antes de tentar de novo.');
+    }
+    throw new Error('Resposta inválida do servidor. Tente novamente em instantes.');
+  }
+}
 
 export default function LikeButton({ postId, artistWallet, initialCount = 0, wallet: injectedWallet }) {
   const contextWallet = useWallet();
@@ -25,7 +39,7 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
       if (!wallet.publicKey || !postId) { setChecked(true); return; }
       try {
         const r = await fetch(`/api/likes?postId=${encodeURIComponent(postId)}&wallet=${encodeURIComponent(wallet.publicKey.toBase58())}`);
-        const data = await r.json();
+        const data = await safeJson(r);
         if (!active) return;
         setLiked(!!data.liked);
         setCount(data.count ?? initialCount);
@@ -61,7 +75,7 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId, wallet: wallet.publicKey.toBase58(), tx, artistWallet }),
       });
-      const data = await r.json();
+      const data = await safeJson(r);
       if (!r.ok) throw new Error(data.error || 'Falha ao registrar like.');
 
       setLiked(true);

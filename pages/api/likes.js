@@ -54,11 +54,11 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
 
   let parsed;
   try {
-    // Tenta algumas vezes — a tx pode levar alguns segundos para propagar
-    for (let i = 0; i < 4; i++) {
+    // Tenta 2 vezes — equilíbrio entre propagação e o timeout da serverless function
+    for (let i = 0; i < 2; i++) {
       parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
       if (parsed) break;
-      await new Promise(r => setTimeout(r, 2500));
+      await new Promise(r => setTimeout(r, 2000));
     }
   } catch {
     return { ok: false, reason: 'Falha ao consultar transação.' };
@@ -160,3 +160,8 @@ export default async function handler(req, res) {
 
   return res.status(405).json({ error: 'Method not allowed' });
 }
+
+// Dá mais margem de tempo à função (evita timeout/HTML de erro na confirmação)
+export const config = {
+  maxDuration: 30,
+};
