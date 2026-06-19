@@ -21,6 +21,10 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
+  const walletRef = useRef(wallet);
+
+  // Mantém walletRef sempre atualizado (evita closure stale nos callbacks do Leaflet)
+  useEffect(() => { walletRef.current = wallet; }, [wallet]);
 
   // Sempre que o estado da wallet mudar (conectar/desconectar/trocar),
   // re-renderiza qualquer LikeButton já montado em popup aberto.
@@ -28,7 +32,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     likeRootsRef.current.forEach(({ root, artistWallet, postId }) => {
       root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} />);
     });
-  }, [wallet]);
+  }, [wallet, wallet.connected, wallet.publicKey]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -125,7 +129,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
         if (postId && artistWallet) {
           const root = createRoot(likeContainer);
           likeRootsRef.current.set(postId, { root, artistWallet, postId });
-          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} />);
+          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} />);
         }
       }
     });
