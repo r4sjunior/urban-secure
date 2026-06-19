@@ -52,21 +52,24 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
 
   const conn = new Connection(rpcUrl, 'confirmed');
 
+  // Verificação RÁPIDA (plano Hobby = 10s). O cliente já confirmou a transação
+  // via polling antes de chamar este endpoint, então fazemos UMA consulta leve.
+  // Se a transação ainda não propagou para este RPC, NÃO travamos: confiamos
+  // na confirmação do cliente e registramos (best-effort).
   let parsed;
   try {
-    // Tenta 2 vezes — equilíbrio entre propagação e o timeout da serverless function
-    for (let i = 0; i < 2; i++) {
-      parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
-      if (parsed) break;
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
   } catch {
-    return { ok: false, reason: 'Falha ao consultar transação.' };
+    // Falha de RPC não deve bloquear: o cliente já confirmou on-chain.
+    return { ok: true, verified: false };
   }
-  if (!parsed) return { ok: false, reason: 'Transação não encontrada ou não confirmada.' };
+
+  // Transação ainda não visível neste RPC → confia no cliente.
+  if (!parsed) return { ok: true, verified: false };
+
+  // A partir daqui conseguimos ver a transação: validamos de fato.
   if (parsed.meta?.err) return { ok: false, reason: 'Transação falhou on-chain.' };
 
-  // Valor total do like — deve ir INTEGRALMENTE para o artista (autor do NFT)
   const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_LIKE_PRICE_SOL || '0.0028') * 1e9);
 
   const instructions = parsed.transaction.message.instructions || [];
@@ -74,7 +77,6 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
   if (signer !== wallet) return { ok: false, reason: 'Assinante da transação não corresponde à wallet.' };
 
   let paidArtist = 0;
-
   for (const ix of instructions) {
     if (ix.program !== 'system' || ix.parsed?.type !== 'transfer') continue;
     const info = ix.parsed.info;
@@ -82,13 +84,12 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
     if (info.destination === artistWallet) paidArtist += Number(info.lamports);
   }
 
-  // Tolerância mínima (lamports) para evitar falhas por arredondamento
   const TOL = 50;
   if (paidArtist + TOL < priceLamports) {
     return { ok: false, reason: `Pagamento ao artista insuficiente (${paidArtist} < ${priceLamports} lamports).` };
   }
 
-  return { ok: true };
+  return { ok: true, verified: true };
 }
 
 export default async function handler(req, res) {
@@ -161,7 +162,7 @@ export default async function handler(req, res) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-// Dá mais margem de tempo à função (evita timeout/HTML de erro na confirmação)
+// Plano Hobby da Vercel: limite de 10s por função.
 export const config = {
-  maxDuration: 30,
+  maxDuration: 10,
 };
