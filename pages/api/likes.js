@@ -54,7 +54,12 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
 
   let parsed;
   try {
-    parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
+    // Tenta algumas vezes — a tx pode levar alguns segundos para propagar
+    for (let i = 0; i < 4; i++) {
+      parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
+      if (parsed) break;
+      await new Promise(r => setTimeout(r, 2500));
+    }
   } catch {
     return { ok: false, reason: 'Falha ao consultar transação.' };
   }
