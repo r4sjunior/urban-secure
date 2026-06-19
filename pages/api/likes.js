@@ -12,8 +12,6 @@
  * }
  */
 
-import { Connection } from '@solana/web3.js';
-
 const LIKES_REGISTRY_NAME = 'urban-secure-likes-v1';
 
 async function getLatestLikes(jwt) {
@@ -50,31 +48,39 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
     ? `https://${cluster}.helius-rpc.com/?api-key=${apiKey}`
     : (cluster === 'mainnet' ? 'https://api.mainnet-beta.solana.com' : 'https://api.devnet.solana.com');
 
-  // Vercel serverless não suporta WebSocket — desabilita para evitar erros/lentidão
-  const conn = new Connection(rpcUrl, { commitment: 'confirmed', wsEndpoint: undefined, disableRetryOnRateLimit: true });
-
-  // Verificação RÁPIDA (plano Hobby = 10s). O cliente já confirmou a transação
-  // via polling antes de chamar este endpoint, então fazemos UMA consulta leve.
-  // Se a transação ainda não propagou para este RPC, NÃO travamos: confiamos
-  // na confirmação do cliente e registramos (best-effort).
+  // Consulta a transação via JSON-RPC com fetch puro (SEM @solana/web3.js).
+  // Isso evita o ERR_INTERNAL_ASSERTION / WebSocket que o Connection dispara
+  // dentro da função serverless da Vercel.
   let parsed;
   try {
-    parsed = await conn.getParsedTransaction(tx, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' });
+    const r = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'getTransaction',
+        params: [tx, { encoding: 'jsonParsed', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }],
+      }),
+    });
+    const json = await r.json();
+    parsed = json?.result;
   } catch {
     // Falha de RPC não deve bloquear: o cliente já confirmou on-chain.
     return { ok: true, verified: false };
   }
 
-  // Transação ainda não visível neste RPC → confia no cliente.
+  // Transação ainda não visível neste RPC → confia no cliente (best-effort).
   if (!parsed) return { ok: true, verified: false };
-
-  // A partir daqui conseguimos ver a transação: validamos de fato.
   if (parsed.meta?.err) return { ok: false, reason: 'Transação falhou on-chain.' };
 
   const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_LIKE_PRICE_SOL || '0.0028') * 1e9);
 
-  const instructions = parsed.transaction.message.instructions || [];
-  const signer = parsed.transaction.message.accountKeys?.find(k => k.signer)?.pubkey?.toString();
+  const msg = parsed.transaction?.message;
+  const instructions = msg?.instructions || [];
+  const accountKeys = msg?.accountKeys || [];
+  // No formato jsonParsed, accountKeys é uma lista de { pubkey, signer, writable }
+  const signer = accountKeys.find(k => k.signer)?.pubkey;
   if (signer !== wallet) return { ok: false, reason: 'Assinante da transação não corresponde à wallet.' };
 
   let paidArtist = 0;
@@ -95,8 +101,18 @@ async function verifyLikePayment({ tx, wallet, artistWallet, network }) {
 
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  try {
+    return await handleLikes(req, res);
+  } catch (err) {
+    console.error('[/api/likes FATAL]', err?.message, err?.stack);
+    // Sempre retorna JSON (nunca HTML) para o cliente conseguir ler o erro
+    return res.status(500).json({ error: `Erro no servidor: ${err?.message || 'desconhecido'}` });
+  }
+}
+
+async function handleLikes(req, res) {
   const jwt = process.env.PINATA_JWT;
-  if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
+  if (!jwt) return res.status(500).json({ error: 'PINATA_JWT ausente no ambiente da função.' });
 
   if (req.method === 'GET') {
     const { postId, wallet } = req.query;
