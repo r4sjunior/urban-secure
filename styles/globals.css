@@ -69,6 +69,11 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .carousel{position:absolute;top:0;left:0;right:0;z-index:620;padding:12px 0 10px;background:linear-gradient(180deg,rgba(10,11,13,.85),rgba(10,11,13,.35) 70%,transparent);backdrop-filter:blur(6px);pointer-events:none}
 .carousel-track{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:0 14px 4px;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;pointer-events:auto;scrollbar-width:none}
 .carousel-track::-webkit-scrollbar{display:none}
+/* Em movimento: desliza em loop contínuo (a lista é renderizada duplicada) */
+.carousel-track.carousel-animate{overflow:visible;width:max-content;animation:marquee linear infinite}
+.carousel-track.carousel-animate:hover,.carousel-track.carousel-animate:active{animation-play-state:paused}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.carousel-track.carousel-animate{animation:none}}
 .carousel-card{flex:0 0 auto;width:84px;display:flex;flex-direction:column;gap:6px;padding:0;border:none;background:none;cursor:pointer;font-family:'Inter';text-align:center}
 .carousel-thumb{width:84px;height:84px;border-radius:var(--r-md);overflow:hidden;background:var(--bg-3);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 6px 18px rgba(0,0,0,.4);transition:transform .18s,border-color .2s,box-shadow .2s}
 .carousel-thumb img{width:100%;height:100%;object-fit:cover}
