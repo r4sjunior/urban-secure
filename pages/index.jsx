@@ -5,6 +5,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
 import { resizeImage } from '../lib/resizeImage';
 import ArtCarousel from '../components/ArtCarousel';
+import BootScreen from '../components/BootScreen';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
@@ -143,6 +144,7 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState('');
   const [gps, setGps] = useState(null);
   const [busca, setBusca] = useState('');
+  const [booting, setBooting] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
 
@@ -247,6 +249,8 @@ export default function Home() {
         <link rel="manifest" href="/manifest.json" />
         <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
+
+      {booting && <BootScreen onDone={() => setBooting(false)} />}
 
       <div className="app">
         {/* Fundo animado */}
