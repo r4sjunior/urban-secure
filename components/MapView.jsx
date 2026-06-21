@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import LikeButton from './LikeButton';
@@ -9,7 +9,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoading = false }, ref) {
+const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoading = false, onReady }, ref) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -23,20 +23,25 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
 
-  // Expõe focusArt() para o carrossel: centraliza o mapa na arte e abre o popup
-  useImperativeHandle(ref, () => ({
-    focusArt(art) {
-      if (!art || !mapRef.current) return;
-      const entry = art.id ? markersByIdRef.current.get(art.id) : null;
-      const lat = art.lat, lng = art.lng;
-      if (typeof lat !== 'number' || typeof lng !== 'number') return;
-      mapRef.current.flyTo([lat, lng], 17, { duration: 1.1 });
-      if (entry?.marker) {
-        // abre o popup após a animação chegar
-        setTimeout(() => entry.marker.openPopup(), 1150);
-      }
-    },
-  }), []);
+  // Centraliza o mapa na arte e abre o popup. Usada pelo carrossel.
+  const focusArt = useCallback((art) => {
+    if (!art || !mapRef.current) return;
+    const entry = art.id ? markersByIdRef.current.get(art.id) : null;
+    const lat = art.lat, lng = art.lng;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return;
+    mapRef.current.flyTo([lat, lng], 17, { duration: 1.1 });
+    if (entry?.marker) {
+      setTimeout(() => entry.marker.openPopup(), 1150);
+    }
+  }, []);
+
+  // Expõe focusArt de DUAS formas (uma delas sempre funciona com next/dynamic):
+  // 1) via ref (useImperativeHandle) — caso o ref seja repassado
+  // 2) via callback onReady — funciona sempre, mesmo com dynamic ssr:false
+  useImperativeHandle(ref, () => ({ focusArt }), [focusArt]);
+  useEffect(() => {
+    if (typeof onReady === 'function') onReady({ focusArt });
+  }, [onReady, focusArt]);
   const walletRef = useRef(wallet);
 
   // Mantém walletRef sempre atualizado (evita closure stale nos callbacks do Leaflet)

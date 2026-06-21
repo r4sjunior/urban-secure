@@ -131,6 +131,8 @@ export default function Home() {
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
 
   const mapRef = useRef(null);
+  // Recebe a API do mapa via callback (funciona mesmo com next/dynamic)
+  const handleMapReady = useCallback((api) => { mapRef.current = api; }, []);
   const handleSelectArt = useCallback((art) => {
     if (mapRef.current?.focusArt) mapRef.current.focusArt(art);
   }, []);
@@ -264,7 +266,7 @@ export default function Home() {
 
         {/* Mapa em tela cheia */}
         <main className="map-stage">
-          <MapView ref={mapRef} onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
+          <MapView onReady={handleMapReady} onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
 
           {/* Carrossel de artes registradas (topo) */}
           <ArtCarousel arts={artsFiltradas} onSelect={handleSelectArt} />
