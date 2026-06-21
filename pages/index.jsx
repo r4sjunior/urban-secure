@@ -6,6 +6,8 @@ import { useArts } from '../context/ArtsContext';
 import { resizeImage } from '../lib/resizeImage';
 import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
+import SoundToggle from '../components/SoundToggle';
+import { sound } from '../lib/sound';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
@@ -135,6 +137,7 @@ export default function Home() {
   // Recebe a API do mapa via callback (funciona mesmo com next/dynamic)
   const handleMapReady = useCallback((api) => { mapRef.current = api; }, []);
   const handleSelectArt = useCallback((art) => {
+    sound.play('click');
     if (mapRef.current?.focusArt) mapRef.current.focusArt(art);
   }, []);
 
@@ -194,6 +197,7 @@ export default function Home() {
     const nftName = `Urban Art — ${nome}`;
 
     setIsMinting(true); setMintError(null); setMintResult(null);
+    sound.play('transaction');
 
     try {
       setMintStep('upload-image');
@@ -213,6 +217,7 @@ export default function Home() {
         solscanUrl: `https://solscan.io/token/${mintAddress}${network==='devnet'?'?cluster=devnet':''}`,
       });
       setMintStep('success');
+      sound.play('success');
       const novaArte = { id: mintAddress, name: nftName, artistName: nome, description: descricao, lat: gps.lat, lng: gps.lng, imageUrl: imageUri, artistWallet, timestamp: Date.now() };
       addArt(novaArte);
 
@@ -232,6 +237,7 @@ export default function Home() {
       else if (msg.includes('expired') || msg.includes('block height') || msg.includes('blockhash')) msg = 'A rede demorou a confirmar. Verifique sua carteira ou tente de novo.';
       else msg = 'Não foi possível mintar. Tente novamente.';
       setMintError(msg); setMintStep(null);
+      sound.play('error');
     } finally { setIsMinting(false); }
   };
 
@@ -263,8 +269,11 @@ export default function Home() {
             <span className="brand-mark">◢◣</span>
             <span className="brand-name">URBAN<span className="brand-accent">SECURE</span></span>
           </div>
-          <div className={`gps-chip ${gpsClass}`}>
-            <span className="gps-led" />{gpsLabel}
+          <div className="topbar-right">
+            <div className={`gps-chip ${gpsClass}`}>
+              <span className="gps-led" />{gpsLabel}
+            </div>
+            <SoundToggle />
           </div>
         </header>
 
@@ -286,9 +295,9 @@ export default function Home() {
         <nav className="dock">
           <div className="dock-wallet"><WalletHandler /></div>
           {wallet.connected && (
-            <button className="dock-send" onClick={() => setTransferOpen(true)} title="Enviar arte">📤</button>
+            <button className="dock-send" onClick={() => { sound.play('click'); setTransferOpen(true); }} title="Enviar arte">📤</button>
           )}
-          <button className="dock-cta" onClick={() => setSheetOpen(true)}>
+          <button className="dock-cta" onClick={() => { sound.play('click'); setSheetOpen(true); }}>
             <span className="dock-cta-icon">＋</span>
             Registrar Arte
           </button>

@@ -248,3 +248,11 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 @media (prefers-reduced-motion:reduce){
   .boot-ascii{animation:none}
 }
+
+/* ── Sound toggle + topbar right ── */
+.topbar-right{display:flex;align-items:center;gap:10px}
+.sound-toggle{width:40px;height:40px;flex-shrink:0;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;backdrop-filter:blur(8px);transition:transform .15s,border-color .2s,box-shadow .2s;display:flex;align-items:center;justify-content:center}
+.sound-toggle:hover{border-color:var(--accent-bd)}
+.sound-toggle:active{transform:scale(.92)}
+.sound-toggle:not(.off){border-color:var(--accent-bd);box-shadow:0 0 14px rgba(45,212,191,.25)}
+@media (max-width:360px){.sound-toggle{width:36px;height:36px;font-size:14px}}

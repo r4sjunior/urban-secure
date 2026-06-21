@@ -8,6 +8,7 @@
  *   onDone() — chamado quando o boot termina (naturalmente ou via skip)
  */
 import { useEffect, useRef, useState } from 'react';
+import { sound } from '../lib/sound';
 
 const ASCII = String.raw`
  ██╗   ██╗██████╗ ██████╗  █████╗ ███╗   ██╗
@@ -62,12 +63,21 @@ export default function BootScreen({ onDone }) {
     onDone && onDone();
   };
 
+  // Inicia a trilha no primeiro gesto do usuário (respeita autoplay-block).
+  const kickAudio = () => {
+    if (!sound.isMuted()) sound.startMusic();
+  };
+
   useEffect(() => {
     let acc = 0;
     LINES.forEach((line, i) => {
       const t = setTimeout(() => {
         setShown(prev => [...prev, line]);
         setProgress(Math.round(((i + 1) / LINES.length) * 100));
+        // som por linha (só toca se o usuário já ligou o áudio)
+        if (line.tag === 'ok' || line.tag === 'sys') sound.play('bootTick');
+        else if (line.tag === 'dial') sound.play('transaction');
+        else if (line.tag === 'go') sound.play('bootConnected');
       }, acc);
       timers.current.push(t);
       acc += line.d;
@@ -92,7 +102,7 @@ export default function BootScreen({ onDone }) {
   }, [shown]);
 
   return (
-    <div className="boot" onClick={finish} role="button" title="Clique para pular">
+    <div className="boot" onClick={() => { kickAudio(); finish(); }} role="button" title="Clique para pular" onMouseDown={kickAudio} onTouchStart={kickAudio}>
       <div className="boot-scanlines" />
       <button className="boot-skip" onClick={(e) => { e.stopPropagation(); finish(); }}>skip ▶</button>
 
