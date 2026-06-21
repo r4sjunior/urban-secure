@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
 import { resizeImage } from '../lib/resizeImage';
+import ArtCarousel from '../components/ArtCarousel';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
@@ -128,6 +129,11 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
 export default function Home() {
   const wallet = useWallet();
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
+
+  const mapRef = useRef(null);
+  const handleSelectArt = useCallback((art) => {
+    if (mapRef.current?.focusArt) mapRef.current.focusArt(art);
+  }, []);
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -258,7 +264,10 @@ export default function Home() {
 
         {/* Mapa em tela cheia */}
         <main className="map-stage">
-          <MapView onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
+          <MapView ref={mapRef} onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
+
+          {/* Carrossel de artes registradas (topo) */}
+          <ArtCarousel arts={artsFiltradas} onSelect={handleSelectArt} />
 
           {/* Busca flutuante */}
           <div className="search-float">

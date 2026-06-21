@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import LikeButton from './LikeButton';
@@ -9,10 +9,11 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-export default function MapView({ onLocationUpdate, arts = [], isLoading = false }) {
+const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoading = false }, ref) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const markersByIdRef = useRef(new Map()); // art.id -> { marker, art }
   const [lightbox, setLightbox] = useState(null); // url da imagem ampliada
   const circleRef = useRef(null);
   const artMarkersRef = useRef([]);
@@ -21,6 +22,21 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
+
+  // Expõe focusArt() para o carrossel: centraliza o mapa na arte e abre o popup
+  useImperativeHandle(ref, () => ({
+    focusArt(art) {
+      if (!art || !mapRef.current) return;
+      const entry = art.id ? markersByIdRef.current.get(art.id) : null;
+      const lat = art.lat, lng = art.lng;
+      if (typeof lat !== 'number' || typeof lng !== 'number') return;
+      mapRef.current.flyTo([lat, lng], 17, { duration: 1.1 });
+      if (entry?.marker) {
+        // abre o popup após a animação chegar
+        setTimeout(() => entry.marker.openPopup(), 1150);
+      }
+    },
+  }), []);
   const walletRef = useRef(wallet);
 
   // Mantém walletRef sempre atualizado (evita closure stale nos callbacks do Leaflet)
@@ -71,6 +87,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
     const L = require('leaflet');
     artMarkersRef.current.forEach(m => m.remove());
     artMarkersRef.current = [];
+    markersByIdRef.current.clear();
 
     const COLORS = ['#FF3D71', '#FFD23F', '#3DFF88'];
     const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
@@ -108,6 +125,7 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
       const marker = L.marker([art.lat, art.lng], { icon })
         .addTo(mapRef.current).bindPopup(popup, { maxWidth: 240, className: 'art-popup-wrap' });
       artMarkersRef.current.push(marker);
+      if (art.id) markersByIdRef.current.set(art.id, { marker, art });
     });
 
     // Ao abrir um popup, conecta o clique na imagem para expandir (lightbox)
@@ -206,4 +224,6 @@ export default function MapView({ onLocationUpdate, arts = [], isLoading = false
       )}
     </div>
   );
-}
+});
+
+export default MapView;
