@@ -4,7 +4,7 @@
  * Não gera transação on-chain; usa wallet.signMessage() do Phantom.
  * Auth é armazenada em sessionStorage (expira ao fechar a aba).
  */
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 const SESSION_KEY = 'urban-secure:auth';
@@ -27,15 +27,11 @@ export function WalletAuthProvider({ children }) {
   const [isSigning,       setIsSigning]       = useState(false);
   const [authError,       setAuthError]        = useState(null);
 
-  const autoPrompted   = useRef(false);
-  const authenticateRef = useRef(null);
-
   // Reseta auth quando carteira desconecta ou troca de conta
   useEffect(() => {
     if (!wallet.connected || !wallet.publicKey) {
       setIsAuthenticated(false);
       setAuthError(null);
-      autoPrompted.current = false;
     }
   }, [wallet.connected, wallet.publicKey]);
 
@@ -92,21 +88,9 @@ export function WalletAuthProvider({ children }) {
     }
   }, [wallet]);
 
-  // Mantém ref sempre atualizada (evita stale closure no auto-prompt)
-  useEffect(() => { authenticateRef.current = authenticate; }, [authenticate]);
-
-  // Auto-prompt: dispara assinatura automaticamente ao conectar a carteira
-  useEffect(() => {
-    if (!wallet.connected || !wallet.publicKey || isAuthenticated || isSigning || autoPrompted.current) return;
-    autoPrompted.current = true;
-    const t = setTimeout(() => authenticateRef.current?.(), 500);
-    return () => clearTimeout(t);
-  }, [wallet.connected, wallet.publicKey, isAuthenticated, isSigning]);
-
   const logout = useCallback(async () => {
     setIsAuthenticated(false);
     setAuthError(null);
-    autoPrompted.current = false;
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
     try { await wallet.disconnect(); } catch (e) { console.error('[WalletAuth] disconnect:', e?.message); }
     try { localStorage.removeItem('urban-secure:wallet'); } catch {}

@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     // Merge sem duplicatas (por id)
     const map = new Map();
     [...registry, ...helius].forEach(a => { if (a?.id) map.set(a.id, a); });
-    const arts = Array.from(map.values()).filter(a => typeof a.lat === 'number' && !isNaN(a.lat) && typeof a.lng === 'number' && !isNaN(a.lng));
+    const arts = Array.from(map.values()).filter(a => !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng)));
 
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=120');
     return res.status(200).json({ arts, total: arts.length });
