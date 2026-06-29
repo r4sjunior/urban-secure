@@ -31,6 +31,7 @@
     "react": "^18",
     "react-dom": "^18",
     "stream-browserify": "3.0.0",
+    "tweetnacl": "^1.0.3",
     "url": "0.11.3"
   },
   "devDependencies": {

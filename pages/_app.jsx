@@ -4,6 +4,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { clusterApiUrl } from '@solana/web3.js';
 import { ArtsProvider } from '../context/ArtsContext';
+import { WalletAuthProvider } from '../context/WalletAuthContext';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 import '../styles/globals.css';
@@ -22,7 +23,9 @@ function Providers({ children }) {
         onError={(e) => console.error('[WalletProvider]', e?.message, e?.error?.message)}
       >
         <WalletModalProvider>
-          <ArtsProvider>{children}</ArtsProvider>
+          <WalletAuthProvider>
+            <ArtsProvider>{children}</ArtsProvider>
+          </WalletAuthProvider>
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

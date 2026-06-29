@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
+import { useWalletAuth } from '../context/WalletAuthContext';
 import { resizeImage } from '../lib/resizeImage';
 import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
@@ -131,6 +132,7 @@ async function mintUrbanArt({ wallet, metadataUri, name }) {
 
 export default function Home() {
   const wallet = useWallet();
+  const { isAuthenticated } = useWalletAuth();
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
 
   const mapRef = useRef(null);
@@ -187,6 +189,7 @@ export default function Home() {
 
   const handleMint = async () => {
     if (!wallet.connected || !wallet.publicKey) return setMintError('Conecte sua carteira primeiro.');
+    if (!isAuthenticated) return setMintError('Assine na carteira para registrar uma arte.');
     const gpsOk = gps && !gps.error && gps.lat && gps.lng;
     if (!gpsOk) return setMintError('Aguardando GPS. Vá para área aberta.');
     if (!nome.trim() || !descricao.trim()) return setMintError('Preencha nome e descrição.');
@@ -294,7 +297,7 @@ export default function Home() {
         {/* Dock inferior */}
         <nav className="dock">
           <div className="dock-wallet"><WalletHandler /></div>
-          {wallet.connected && (
+          {wallet.connected && isAuthenticated && (
             <button className="dock-send" onClick={() => { sound.play('click'); setTransferOpen(true); }} title="Enviar arte">📤</button>
           )}
           <button className="dock-cta" onClick={() => { sound.play('click'); setSheetOpen(true); }}>
@@ -332,6 +335,9 @@ export default function Home() {
             <input className="fld" placeholder="Nome do artista" value={nome} onChange={e=>setNome(e.target.value)} maxLength={50} disabled={isMinting} />
             <textarea className="fld" placeholder="Descrição da obra" value={descricao} onChange={e=>setDescricao(e.target.value)} rows={2} maxLength={200} disabled={isMinting} />
 
+            {wallet.connected && !isAuthenticated && !isMinting && !mintError && (
+              <div className="auth-hint">✍️ Assine na carteira para registrar artes.</div>
+            )}
             {mintError && !isMinting && <div className="err-box">⚠️ {mintError}</div>}
 
             <button className="mint-cta" onClick={handleMint} disabled={isMinting}>

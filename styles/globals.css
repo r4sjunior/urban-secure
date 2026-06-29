@@ -111,6 +111,10 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .wallet-pub{font-family:'Space Grotesk';font-size:13px;font-weight:600}
 .wallet-disconnect{padding:0 16px;height:46px;border-radius:var(--r-md);background:transparent;border:1px solid var(--border-2);color:var(--muted);font-family:'Space Grotesk';font-size:12px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap}
 .wallet-disconnect:hover{border-color:var(--danger);color:var(--danger)}
+.wallet-auth-wrap{display:flex;flex-direction:column;gap:4px;width:100%}
+.wallet-auth-err{font-size:11px;color:#FCA5B5;font-family:'Space Grotesk';text-align:center;padding:0 2px}
+.wallet-sign-btn{border-color:var(--violet)!important;color:var(--violet)!important;background:rgba(139,124,246,.08)!important}
+.wallet-sign-btn:hover:not(:disabled){background:rgba(139,124,246,.2)!important}
 .wallet-btn-wrap{width:100%;position:relative;z-index:10}
 .wallet-btn-wrap .wallet-adapter-button{width:100%!important;height:46px!important;justify-content:center!important;border-radius:var(--r-md)!important;background:var(--bg-2)!important;border:1px solid var(--border-2)!important;color:var(--text)!important;font-family:'Space Grotesk'!important;font-weight:600!important;font-size:13px!important}
 .wallet-adapter-modal-overlay{z-index:99998!important;background:rgba(5,6,8,.7)!important}
@@ -190,9 +194,14 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .transfer-item-check{color:var(--accent);font-size:18px;font-weight:700;flex-shrink:0}
 .transfer-ok{background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:var(--r-md);padding:10px 13px;font-size:13px;color:var(--accent);margin-bottom:10px}
 
-.like-button-wrap{display:flex;flex-direction:column;gap:4px}
+.like-button-wrap{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.like-btn{padding:6px 12px;border-radius:var(--r-sm);border:1px solid var(--border-2);background:var(--bg-3);color:var(--text);font-family:'Space Grotesk';font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.like-btn:hover:not(:disabled){border-color:var(--danger);color:var(--danger)}
+.like-btn.liked{border-color:var(--danger);color:var(--danger);background:rgba(251,113,133,.1);cursor:default}
+.like-btn:disabled{opacity:.5;cursor:not-allowed}
 .like-price{font-size:11px;color:var(--muted);font-family:'Space Grotesk'}
 .like-error{font-size:11px;color:#FCA5B5}
+.auth-hint{background:rgba(139,124,246,.1);border:1px solid rgba(139,124,246,.3);border-radius:var(--r-md);padding:10px 13px;font-size:13px;color:var(--violet);margin-bottom:10px;line-height:1.4}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 

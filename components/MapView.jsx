@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletAuth } from '../context/WalletAuthContext';
 import LikeButton from './LikeButton';
 
 function escapeHtml(str) {
@@ -22,6 +23,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
+  const { isAuthenticated } = useWalletAuth();
+  const isAuthRef = useRef(isAuthenticated);
 
   // Centraliza o mapa na arte e abre o popup. Usada pelo carrossel.
   const focusArt = useCallback((art) => {
@@ -44,16 +47,16 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   }, [onReady, focusArt]);
   const walletRef = useRef(wallet);
 
-  // Mantém walletRef sempre atualizado (evita closure stale nos callbacks do Leaflet)
+  // Mantém refs sempre atualizados (evita closure stale nos callbacks do Leaflet)
   useEffect(() => { walletRef.current = wallet; }, [wallet]);
+  useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
 
-  // Sempre que o estado da wallet mudar (conectar/desconectar/trocar),
-  // re-renderiza qualquer LikeButton já montado em popup aberto.
+  // Quando wallet ou auth mudar, re-renderiza LikeButtons já montados em popups abertos.
   useEffect(() => {
     likeRootsRef.current.forEach(({ root, artistWallet, postId }) => {
-      root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} />);
+      root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} isAuthenticated={isAuthenticated} />);
     });
-  }, [wallet, wallet.connected, wallet.publicKey]);
+  }, [wallet, wallet.connected, wallet.publicKey, isAuthenticated]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -154,7 +157,7 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
         if (postId && artistWallet) {
           const root = createRoot(likeContainer);
           likeRootsRef.current.set(postId, { root, artistWallet, postId });
-          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} />);
+          root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} isAuthenticated={isAuthRef.current} />);
         }
       }
     });

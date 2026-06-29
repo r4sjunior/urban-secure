@@ -21,7 +21,7 @@ async function safeJson(res) {
   }
 }
 
-export default function LikeButton({ postId, artistWallet, initialCount = 0, wallet: injectedWallet }) {
+export default function LikeButton({ postId, artistWallet, initialCount = 0, wallet: injectedWallet, isAuthenticated = false }) {
   const contextWallet = useWallet();
   const wallet = injectedWallet || contextWallet;
   const [liked, setLiked] = useState(false);
@@ -60,6 +60,10 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
       setError('Conecte sua carteira para curtir.');
       return;
     }
+    if (!isAuthenticated) {
+      setError('Assine na carteira para curtir.');
+      return;
+    }
     if (isOwnPost) {
       setError('Você não pode curtir o próprio post.');
       return;
@@ -89,7 +93,7 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
     } finally {
       setLoading(false);
     }
-  }, [wallet, liked, isOwnPost, postId, artistWallet, count]);
+  }, [wallet, liked, isOwnPost, postId, artistWallet, count, isAuthenticated]);
 
   return (
     <div className="like-button-wrap">
@@ -97,7 +101,12 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
         className={`like-btn ${liked ? 'liked' : ''}`}
         onClick={handleLike}
         disabled={loading || liked || isOwnPost || !checked}
-        title={isOwnPost ? 'Você não pode curtir o próprio post' : `Curtir por ${getLikePriceSol()} SOL`}
+        title={
+          !wallet.connected ? 'Conecte sua carteira para curtir' :
+          !isAuthenticated  ? 'Assine na carteira para curtir' :
+          isOwnPost         ? 'Você não pode curtir o próprio post' :
+          `Curtir por ${getLikePriceSol()} SOL`
+        }
       >
         {loading ? '⏳' : liked ? '❤️' : '🤍'} {count}
       </button>
