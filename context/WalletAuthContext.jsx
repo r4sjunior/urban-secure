@@ -10,12 +10,16 @@ import { useWallet } from '@solana/wallet-adapter-react';
 const SESSION_KEY = 'urban-secure:auth';
 
 function buildMessage(pubkey) {
+  // Nonce criptográfico aleatório — impede replay de assinaturas antigas
+  const nonce = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return (
     `Bem-vindo ao Urban Secure!\n\n` +
     `Assine para confirmar que você é o dono desta carteira.\n` +
     `Esta ação é gratuita e não gera transação na blockchain.\n\n` +
     `Carteira: ${pubkey}\n` +
-    `Nonce: ${Date.now()}`
+    `Nonce: ${nonce}`
   );
 }
 

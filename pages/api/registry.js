@@ -2,10 +2,17 @@
  * pages/api/registry.js
  * Registro próprio de artes (contorna falta de indexação na devnet).
  * GET  → lista as artes registradas
- * POST → adiciona uma arte ao índice
+ * POST → adiciona uma arte ao índice (valida formato e propriedade do NFT)
  */
 
-const REGISTRY_NAME = 'urban-secure-registry-v1';
+const REGISTRY_NAME  = 'urban-secure-registry-v1';
+const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+// Remove caracteres que poderiam ser usados para injeção de HTML/scripts
+function sanitize(val, maxLen) {
+  if (typeof val !== 'string') return '';
+  return val.replace(/[<>"'`\\]/g, '').trim().slice(0, maxLen);
+}
 
 async function getLatestRegistry(jwt) {
   try {
@@ -23,6 +30,30 @@ async function getLatestRegistry(jwt) {
   }
 }
 
+/**
+ * Verifica via Helius DAS que o NFT pertence à wallet declarada.
+ * Só usado em mainnet onde o DAS indexa os assets.
+ */
+async function verifyNftOwnership(mintId, ownerWallet) {
+  const apiKey = process.env.HELIUS_API_KEY;
+  if (!apiKey) return true; // sem chave, aceita (best-effort)
+  try {
+    const r = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getAsset', params: { id: mintId } }),
+    });
+    if (!r.ok) return true; // falha de API — aceita
+    const data = await r.json();
+    const owner = data?.result?.ownership?.owner;
+    // Se DAS não retornar owner, aceita (NFT pode não estar indexado ainda)
+    if (!owner) return true;
+    return owner === ownerWallet;
+  } catch {
+    return true; // falha de rede — aceita
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const jwt = process.env.PINATA_JWT;
@@ -36,12 +67,52 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      const art = req.body;
-      if (!art?.id || isNaN(parseFloat(art.lat)) || isNaN(parseFloat(art.lng))) {
-        return res.status(400).json({ error: 'Dados inválidos.' });
+      const body = req.body;
+
+      // Valida formatos de endereço Solana
+      if (!body?.id || !SOLANA_ADDR_RE.test(body.id)) {
+        return res.status(400).json({ error: 'ID de mint inválido.' });
       }
+      if (!body?.artistWallet || !SOLANA_ADDR_RE.test(body.artistWallet)) {
+        return res.status(400).json({ error: 'Endereço de artista inválido.' });
+      }
+
+      // Valida coordenadas GPS com faixas realistas
+      const lat = parseFloat(body.lat);
+      const lng = parseFloat(body.lng);
+      if (isNaN(lat) || lat < -90  || lat > 90)  return res.status(400).json({ error: 'Latitude inválida.' });
+      if (isNaN(lng) || lng < -180 || lng > 180) return res.status(400).json({ error: 'Longitude inválida.' });
+
+      // Valida URL da imagem: só aceita gateway oficial do Pinata
+      const rawUrl = typeof body.imageUrl === 'string' ? body.imageUrl : '';
+      const imageUrl = rawUrl.startsWith('https://gateway.pinata.cloud/ipfs/') ? rawUrl : '';
+
+      // Constrói objeto sanitizado — nunca persiste campos extras do body
+      const safeArt = {
+        id:           body.id,
+        name:         sanitize(body.name,        200),
+        artistName:   sanitize(body.artistName,  100),
+        description:  sanitize(body.description, 500),
+        lat,
+        lng,
+        imageUrl,
+        artistWallet: body.artistWallet,
+        timestamp:    typeof body.timestamp === 'number' && body.timestamp > 0
+                        ? body.timestamp
+                        : Date.now(),
+      };
+
+      // Em mainnet, verifica que o NFT pertence à wallet declarada
+      const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+      if (network === 'mainnet-beta') {
+        const owned = await verifyNftOwnership(safeArt.id, safeArt.artistWallet);
+        if (!owned) {
+          return res.status(403).json({ error: 'NFT não encontrado ou não pertence a esta carteira.' });
+        }
+      }
+
       const { arts } = await getLatestRegistry(jwt);
-      if (!arts.find(a => a.id === art.id)) arts.push(art);
+      if (!arts.find(a => a.id === safeArt.id)) arts.push(safeArt);
 
       const r = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
         method: 'POST',
