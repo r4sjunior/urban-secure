@@ -62,7 +62,7 @@ async function getHelius(apiKey, network) {
 
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const apiKey  = process.env.HELIUS_API_KEY;
   const jwt     = process.env.PINATA_JWT;
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     // Merge sem duplicatas (por id)
     const map = new Map();
     [...registry, ...helius].forEach(a => { if (a?.id) map.set(a.id, a); });
-    const arts = Array.from(map.values()).filter(a => !isNaN(a.lat) && !isNaN(a.lng));
+    const arts = Array.from(map.values()).filter(a => typeof a.lat === 'number' && !isNaN(a.lat) && typeof a.lng === 'number' && !isNaN(a.lng));
 
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=120');
     return res.status(200).json({ arts, total: arts.length });

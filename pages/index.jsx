@@ -243,7 +243,7 @@ export default function Home() {
 
   const gpsOk = gps && !gps.error && gps.lat && gps.lng;
   const gpsClass = !gps ? 'wait' : gps.error ? 'err' : 'ok';
-  const gpsLabel = !gps ? 'Buscando GPS…' : gps.error ? gps.error : `GPS ±${gps.acc}m`;
+  const gpsLabel = !gps ? 'Buscando GPS…' : gps.error ? gps.error : gps.acc > 0 ? `GPS ±${gps.acc}m` : 'GPS';
 
   return (
     <>
@@ -344,9 +344,9 @@ export default function Home() {
 
         {/* Overlay do mint — aparece durante processo, sucesso, ou erro fora do sheet */}
         <MintOverlay
-          visible={isMinting || mintStep === 'success'}
+          visible={isMinting || mintStep === 'success' || !!mintError}
           step={mintStep}
-          error={null}
+          error={mintError}
           result={mintResult}
           onDismiss={handleOverlayDismiss}
         />

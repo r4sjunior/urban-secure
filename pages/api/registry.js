@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const art = req.body;
-      if (!art?.id || isNaN(art.lat) || isNaN(art.lng)) {
+      if (!art?.id || typeof art.lat !== 'number' || isNaN(art.lat) || typeof art.lng !== 'number' || isNaN(art.lng)) {
         return res.status(400).json({ error: 'Dados inválidos.' });
       }
       const { arts } = await getLatestRegistry(jwt);

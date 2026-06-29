@@ -3,13 +3,11 @@
  * Botão visível para ligar/desligar som (SFX + música).
  * Ao ligar, inicia o AudioContext e a trilha pulsante.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { sound } from '../lib/sound';
 
 export default function SoundToggle() {
-  const [muted, setMuted] = useState(true);
-
-  useEffect(() => { setMuted(sound.isMuted()); }, []);
+  const [muted, setMuted] = useState(() => typeof window !== 'undefined' ? sound.isMuted() : true);
 
   const onToggle = () => {
     const nowMuted = sound.toggleMute();

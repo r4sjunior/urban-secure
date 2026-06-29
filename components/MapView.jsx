@@ -90,6 +90,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined') return;
     const L = require('leaflet');
+    likeRootsRef.current.forEach(({ root }) => root.unmount());
+    likeRootsRef.current.clear();
     artMarkersRef.current.forEach(m => m.remove());
     artMarkersRef.current = [];
     markersByIdRef.current.clear();
