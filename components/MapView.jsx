@@ -30,8 +30,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const focusArt = useCallback((art) => {
     if (!art || !mapRef.current) return;
     const entry = art.id ? markersByIdRef.current.get(art.id) : null;
-    const lat = art.lat, lng = art.lng;
-    if (typeof lat !== 'number' || typeof lng !== 'number') return;
+    const lat = parseFloat(art.lat), lng = parseFloat(art.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
     mapRef.current.flyTo([lat, lng], 17, { duration: 1.1 });
     if (entry?.marker) {
       setTimeout(() => entry.marker.openPopup(), 1150);
