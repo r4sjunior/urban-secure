@@ -6,20 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { payForLike, getLikePriceSol } from '../lib/likePayment';
-
-// Lê a resposta com segurança: se o servidor devolver HTML (erro/timeout),
-// não quebra no JSON.parse — devolve uma mensagem tratável.
-async function safeJson(res) {
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    if (res.status === 504 || /timeout/i.test(text)) {
-      throw new Error('O servidor demorou para responder. Seu pagamento pode ter sido feito — verifique no Solscan antes de tentar de novo.');
-    }
-    throw new Error('Resposta inválida do servidor. Tente novamente em instantes.');
-  }
-}
+import { safeJson } from '../lib/safeJson';
 
 export default function LikeButton({ postId, artistWallet, initialCount = 0, wallet: injectedWallet, isAuthenticated = false }) {
   const contextWallet = useWallet();

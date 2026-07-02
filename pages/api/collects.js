@@ -185,5 +185,5 @@ async function handleCollects(req, res) {
 }
 
 export const config = {
-  maxDuration: 10,
+  maxDuration: 30,
 };

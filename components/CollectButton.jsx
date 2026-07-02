@@ -13,6 +13,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { payForCollect, getCollectPriceSol, COLLECT_TIERS } from '../lib/collectPayment';
 import { uploadJson, mintNft } from '../lib/mint';
+import { safeJson } from '../lib/safeJson';
 
 const COLLECT_WINDOW_MS = 20 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de mergear
 
@@ -99,7 +100,7 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ postId: art.id, wallet: wallet.publicKey.toBase58(), tx, editionMintId, tier }),
       });
-      const data = await r.json();
+      const data = await safeJson(r);
       if (!r.ok) throw new Error(data.error || 'Falha ao registrar coleta.');
 
       setOk(true);
