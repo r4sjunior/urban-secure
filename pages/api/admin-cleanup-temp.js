@@ -16,6 +16,15 @@ export default async function handler(req, res) {
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'PINATA_JWT ausente.' });
 
+  if (req.query.diag === '1') {
+    const q = `https://api.pinata.cloud/data/pinList?status=pinned&pageLimit=10&sortBy=date_pinned&sortOrder=DESC&metadata[name]=urban-secure-registry-v1`;
+    const r = await fetch(q, { headers: { Authorization: `Bearer ${jwt}` } });
+    const data = await r.json();
+    return res.status(200).json({
+      rows: (data?.rows || []).map(row => ({ hash: row.ipfs_pin_hash, date_pinned: row.date_pinned, size: row.size })),
+    });
+  }
+
   const report = {};
 
   const arts = await getLatestPin(jwt, 'urban-secure-registry-v1', []);
