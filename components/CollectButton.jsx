@@ -18,7 +18,7 @@ import { uploadJson, mintNft } from '../lib/mint';
 import { safeJson } from '../lib/safeJson';
 import { buildProposeOfferMessage, buildRespondOfferMessage } from '../lib/offerSignature';
 
-const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECT_WINDOW_MS = 15 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de terminar
 
 function formatRemaining(ms) {
   if (ms <= 0) return null;

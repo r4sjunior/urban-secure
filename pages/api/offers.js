@@ -17,7 +17,7 @@ import { getRegistryArts } from './registry';
 import { buildProposeOfferMessage, buildRespondOfferMessage } from '../../lib/offerSignature';
 
 export const OFFERS_REGISTRY_NAME = 'urban-secure-offers-v1';
-const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECT_WINDOW_MS = 15 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de terminar
 const OFFER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const COLLECT_TIERS = [5, 10, 20, 50];
 

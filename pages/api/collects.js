@@ -25,7 +25,7 @@ import { getRegistryArts } from './registry';
 import { getOffers, saveOffers } from './offers';
 
 const COLLECTS_REGISTRY_NAME = 'urban-secure-collects-v1';
-const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECT_WINDOW_MS = 15 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de terminar
 const COLLECT_TIERS = [5, 10, 20, 50];
 
 const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
