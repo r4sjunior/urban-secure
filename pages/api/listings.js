@@ -135,7 +135,13 @@ async function handleListings(req, res) {
       return res.status(400).json({ error: 'Preço inválido.' });
     }
 
-    const holds = await verifyVaultHoldsMint(mint);
+    // O RPC pode demorar um pouco pra refletir a transferência que acabou de
+    // confirmar (lag de indexação) — tenta algumas vezes antes de desistir.
+    let holds = false;
+    for (let i = 0; i < 5 && !holds; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 1500));
+      holds = await verifyVaultHoldsMint(mint);
+    }
     if (!holds) {
       return res.status(402).json({ error: 'O NFT ainda não chegou na vault. Aguarde a confirmação da transferência e tente novamente.' });
     }
