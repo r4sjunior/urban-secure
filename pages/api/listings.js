@@ -219,5 +219,5 @@ async function handleListings(req, res) {
 }
 
 export const config = {
-  maxDuration: 20,
+  maxDuration: 45,
 };
