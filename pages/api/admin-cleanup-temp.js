@@ -19,6 +19,15 @@ export default async function handler(req, res) {
 
   const report = {};
 
+  if (req.query.diag === '1') {
+    const q = `https://api.pinata.cloud/data/pinList?status=pinned&pageLimit=10&sortBy=date_pinned&sortOrder=DESC&metadata[name]=urban-secure-registry-v1`;
+    const r = await fetch(q, { headers: { Authorization: `Bearer ${jwt}` } });
+    const data = await r.json();
+    return res.status(200).json({
+      rows: (data?.rows || []).map(row => ({ hash: row.ipfs_pin_hash, date_pinned: row.date_pinned, size: row.size })),
+    });
+  }
+
   const arts = await getLatestPin(jwt, 'urban-secure-registry-v1', []);
   const keptArts = (Array.isArray(arts) ? arts : []).filter(a => !TEST_ART_IDS.has(a.id));
   report.registryBefore = arts.length;
