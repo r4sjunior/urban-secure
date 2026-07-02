@@ -5,19 +5,9 @@
  * que fecha o feed e centraliza o mapa na obra.
  */
 import LikeButton from './LikeButton';
-
-function timeAgo(ts) {
-  if (!ts) return '';
-  const diff = Math.max(0, Date.now() - ts);
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'agora';
-  if (min < 60) return `há ${min}min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h}h`;
-  const d = Math.floor(h / 24);
-  if (d < 30) return `há ${d}d`;
-  return new Date(ts).toLocaleDateString('pt-BR');
-}
+import CollectButton from './CollectButton';
+import CommentsSection from './CommentsSection';
+import { timeAgo } from '../lib/timeAgo';
 
 export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenticated = false }) {
   if (!open) return null;
@@ -66,10 +56,14 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
                 </div>
 
                 <div className="feed-card-body">
-                  <LikeButton postId={art.id} artistWallet={art.artistWallet} isAuthenticated={isAuthenticated} />
+                  <div className="feed-actions">
+                    <LikeButton postId={art.id} artistWallet={art.artistWallet} isAuthenticated={isAuthenticated} />
+                    <CollectButton art={art} isAuthenticated={isAuthenticated} />
+                  </div>
                   <p className="feed-desc">
                     <strong>{art.name}</strong> {art.description}
                   </p>
+                  <CommentsSection postId={art.id} isAuthenticated={isAuthenticated} />
                 </div>
               </article>
             );

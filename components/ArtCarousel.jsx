@@ -4,7 +4,9 @@
  * Desliza sozinho em loop infinito (marquee) e PAUSA ao passar o mouse / tocar.
  * Cada card: imagem + nome do artista. Ao clicar → onSelect(art).
  */
-export default function ArtCarousel({ arts = [], onSelect }) {
+import { forwardRef } from 'react';
+
+const ArtCarousel = forwardRef(function ArtCarousel({ arts = [], onSelect }, ref) {
   if (!arts || arts.length === 0) return null;
 
   // Loop contínuo só faz sentido com algumas artes. Com poucas, fica estático.
@@ -42,7 +44,7 @@ export default function ArtCarousel({ arts = [], onSelect }) {
   };
 
   return (
-    <div className="carousel">
+    <div className="carousel" ref={ref}>
       <div
         className={`carousel-track${animate ? ' carousel-animate' : ''}`}
         style={animate ? { animationDuration: `${duration}s` } : undefined}
@@ -51,4 +53,6 @@ export default function ArtCarousel({ arts = [], onSelect }) {
       </div>
     </div>
   );
-}
+});
+
+export default ArtCarousel;

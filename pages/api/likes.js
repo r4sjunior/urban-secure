@@ -6,6 +6,8 @@
  * POST { postId, wallet, tx } → registra like (após pagamento confirmado on-chain)
  */
 
+import { getLatestPin, savePin } from '../../lib/pinataStore';
+
 const LIKES_REGISTRY_NAME = 'urban-secure-likes-v1';
 
 // Endereço Solana: base58, 32-44 chars
@@ -14,28 +16,12 @@ const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SOLANA_TX_RE   = /^[1-9A-HJ-NP-Za-km-z]{86,90}$/;
 
 async function getLatestLikes(jwt) {
-  try {
-    const q = `https://api.pinata.cloud/data/pinList?status=pinned&pageLimit=1&sortBy=date_pinned&sortOrder=DESC&metadata[name]=${encodeURIComponent(LIKES_REGISTRY_NAME)}`;
-    const r = await fetch(q, { headers: { Authorization: `Bearer ${jwt}` } });
-    if (!r.ok) return { cid: null, likes: {} };
-    const data = await r.json();
-    const row = data?.rows?.[0];
-    if (!row) return { cid: null, likes: {} };
-    const g = await fetch(`https://gateway.pinata.cloud/ipfs/${row.ipfs_pin_hash}`);
-    const likes = await g.json();
-    return { cid: row.ipfs_pin_hash, likes: (likes && typeof likes === 'object') ? likes : {} };
-  } catch {
-    return { cid: null, likes: {} };
-  }
+  const likes = await getLatestPin(jwt, LIKES_REGISTRY_NAME, {});
+  return { likes: (likes && typeof likes === 'object') ? likes : {} };
 }
 
 async function saveLikes(jwt, likes) {
-  const r = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pinataMetadata: { name: LIKES_REGISTRY_NAME }, pinataContent: likes }),
-  });
-  return r.ok;
+  return savePin(jwt, LIKES_REGISTRY_NAME, likes);
 }
 
 /**

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import LikeButton from './LikeButton';
+import CollectButton from './CollectButton';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -17,11 +18,12 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const markersByIdRef = useRef(new Map()); // art.id -> { marker, art }
   const [lightbox, setLightbox] = useState(null); // url da imagem ampliada
   const circleRef = useRef(null);
-  const artMarkersRef = useRef([]);
+  const clusterGroupRef = useRef(null);
   const activeRef = useRef(false);
   const watchRef = useRef(null);
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
+  const collectRootsRef = useRef(new Map()); // postId -> { root, art }
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
   const isAuthRef = useRef(isAuthenticated);
@@ -51,10 +53,13 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   useEffect(() => { walletRef.current = wallet; }, [wallet]);
   useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
 
-  // Quando wallet ou auth mudar, re-renderiza LikeButtons já montados em popups abertos.
+  // Quando wallet ou auth mudar, re-renderiza LikeButtons/CollectButtons já montados em popups abertos.
   useEffect(() => {
     likeRootsRef.current.forEach(({ root, artistWallet, postId }) => {
       root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} isAuthenticated={isAuthenticated} />);
+    });
+    collectRootsRef.current.forEach(({ root, art }) => {
+      root.render(<CollectButton art={art} wallet={wallet} isAuthenticated={isAuthenticated} />);
     });
   }, [wallet, wallet.connected, wallet.publicKey, isAuthenticated]);
 
@@ -62,6 +67,9 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     if (!containerRef.current || mapRef.current) return;
     const L = require('leaflet');
     require('leaflet/dist/leaflet.css');
+    require('leaflet.markercluster');
+    require('leaflet.markercluster/dist/MarkerCluster.css');
+    require('leaflet.markercluster/dist/MarkerCluster.Default.css');
 
     const userIcon = L.divIcon({
       className: '',
@@ -79,24 +87,43 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       maxZoom: 20,
     }).addTo(map);
 
+    // Agrupa pinos próximos numa bolha com contagem — ao afastar o zoom os
+    // pinos não ficam mais se sobrepondo de forma bagunçada "fora do lugar".
+    // Clicar/zoom expande revelando os pinos exatos nas coordenadas reais.
+    clusterGroupRef.current = L.markerClusterGroup({
+      maxClusterRadius: 50,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      iconCreateFunction(cluster) {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 40 : count < 50 ? 48 : 56;
+        return L.divIcon({
+          html: `<div class="marker-cluster-custom" style="width:${size}px;height:${size}px"><span>${count}</span></div>`,
+          className: '',
+          iconSize: [size, size],
+        });
+      },
+    }).addTo(map);
+
     startGPS(L, map, userIcon);
 
     return () => {
       activeRef.current = false;
       stopGPS();
-      artMarkersRef.current.forEach(m => m.remove());
+      if (clusterGroupRef.current) clusterGroupRef.current.clearLayers();
       map.remove();
-      mapRef.current = markerRef.current = circleRef.current = null;
+      mapRef.current = markerRef.current = circleRef.current = clusterGroupRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || typeof window === 'undefined') return;
+    if (!mapRef.current || !clusterGroupRef.current || typeof window === 'undefined') return;
     const L = require('leaflet');
     likeRootsRef.current.forEach(({ root }) => root.unmount());
     likeRootsRef.current.clear();
-    artMarkersRef.current.forEach(m => m.remove());
-    artMarkersRef.current = [];
+    collectRootsRef.current.forEach(({ root }) => root.unmount());
+    collectRootsRef.current.clear();
+    clusterGroupRef.current.clearLayers();
     markersByIdRef.current.clear();
 
     const COLORS = ['#FF3D71', '#FFD23F', '#3DFF88'];
@@ -128,13 +155,16 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
         <strong>${safeName}</strong>
         ${safeArtist ? `<em>por ${safeArtist}</em>` : ''}
         <span>${safeDesc}</span>
-        <div class="art-popup-like" data-post-id="${escapeHtml(art.id)}" data-artist-wallet="${escapeHtml(art.artistWallet)}"></div>
+        <div class="art-popup-actions">
+          <div class="art-popup-like" data-post-id="${escapeHtml(art.id)}" data-artist-wallet="${escapeHtml(art.artistWallet)}"></div>
+          <div class="art-popup-collect" data-post-id="${escapeHtml(art.id)}"></div>
+        </div>
         <a href="${solscanUrl}" target="_blank" rel="noreferrer" class="art-popup-link">🔗 Ver no Solscan</a>
       </div>`;
 
       const marker = L.marker([art.lat, art.lng], { icon })
-        .addTo(mapRef.current).bindPopup(popup, { maxWidth: 240, className: 'art-popup-wrap' });
-      artMarkersRef.current.push(marker);
+        .bindPopup(popup, { maxWidth: 260, className: 'art-popup-wrap' });
+      clusterGroupRef.current.addLayer(marker);
       if (art.id) markersByIdRef.current.set(art.id, { marker, art });
     });
 
@@ -160,6 +190,17 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
           root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} isAuthenticated={isAuthRef.current} />);
         }
       }
+
+      const collectContainer = el?.querySelector('.art-popup-collect');
+      if (collectContainer) {
+        const postId = collectContainer.getAttribute('data-post-id');
+        const art = postId ? markersByIdRef.current.get(postId)?.art : null;
+        if (postId && art) {
+          const root = createRoot(collectContainer);
+          collectRootsRef.current.set(postId, { root, art });
+          root.render(<CollectButton art={art} wallet={walletRef.current} isAuthenticated={isAuthRef.current} />);
+        }
+      }
     });
     mapRef.current.on('popupclose', (e) => {
       const el = e.popup?.getElement();
@@ -170,6 +211,14 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
         // unmount assíncrono para evitar warning de unmount durante render
         setTimeout(() => root.unmount(), 0);
         likeRootsRef.current.delete(postId);
+      }
+
+      const collectContainer = el?.querySelector('.art-popup-collect');
+      const collectPostId = collectContainer?.getAttribute('data-post-id');
+      if (collectPostId && collectRootsRef.current.has(collectPostId)) {
+        const { root } = collectRootsRef.current.get(collectPostId);
+        setTimeout(() => root.unmount(), 0);
+        collectRootsRef.current.delete(collectPostId);
       }
     });
   }, [arts]);

@@ -8,8 +8,10 @@
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { buildRegistryMessage } from '../../lib/registrySignature';
+import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { sanitize } from '../../lib/sanitize';
 
-const REGISTRY_NAME  = 'urban-secure-registry-v1';
+export const REGISTRY_NAME  = 'urban-secure-registry-v1';
 const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
 // Janela de tolerância para o timestamp assinado — evita reuso de assinaturas antigas
@@ -31,26 +33,9 @@ function verifyArtistSignature({ id, artistWallet, timestamp, signature }) {
   }
 }
 
-// Remove caracteres que poderiam ser usados para injeção de HTML/scripts
-function sanitize(val, maxLen) {
-  if (typeof val !== 'string') return '';
-  return val.replace(/[<>"'`\\]/g, '').trim().slice(0, maxLen);
-}
-
-async function getLatestRegistry(jwt) {
-  try {
-    const q = `https://api.pinata.cloud/data/pinList?status=pinned&pageLimit=1&sortBy=date_pinned&sortOrder=DESC&metadata[name]=${encodeURIComponent(REGISTRY_NAME)}`;
-    const r = await fetch(q, { headers: { Authorization: `Bearer ${jwt}` } });
-    if (!r.ok) return { cid: null, arts: [] };
-    const data = await r.json();
-    const row = data?.rows?.[0];
-    if (!row) return { cid: null, arts: [] };
-    const g = await fetch(`https://gateway.pinata.cloud/ipfs/${row.ipfs_pin_hash}`);
-    const arts = await g.json();
-    return { cid: row.ipfs_pin_hash, arts: Array.isArray(arts) ? arts : [] };
-  } catch {
-    return { cid: null, arts: [] };
-  }
+export async function getRegistryArts(jwt) {
+  const arts = await getLatestPin(jwt, REGISTRY_NAME, []);
+  return Array.isArray(arts) ? arts : [];
 }
 
 /**
@@ -83,7 +68,7 @@ export default async function handler(req, res) {
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
 
   if (req.method === 'GET') {
-    const { arts } = await getLatestRegistry(jwt);
+    const arts = await getRegistryArts(jwt);
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=120');
     return res.status(200).json({ arts, total: arts.length });
   }
@@ -146,16 +131,12 @@ export default async function handler(req, res) {
         }
       }
 
-      const { arts } = await getLatestRegistry(jwt);
+      const arts = await getRegistryArts(jwt);
       if (!arts.find(a => a.id === safeArt.id)) arts.push(safeArt);
 
-      const r = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pinataMetadata: { name: REGISTRY_NAME }, pinataContent: arts }),
-      });
-      if (!r.ok) {
-        console.error('[registry POST]', r.status);
+      const saved = await savePin(jwt, REGISTRY_NAME, arts);
+      if (!saved) {
+        console.error('[registry POST] falha ao salvar pin');
         return res.status(502).json({ error: 'Falha ao registrar.' });
       }
       return res.status(200).json({ ok: true, total: arts.length });

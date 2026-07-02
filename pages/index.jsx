@@ -13,6 +13,7 @@ import AudiusPlayer from '../components/AudiusPlayer';
 import ArtFeed from '../components/ArtFeed';
 import Leaderboard from '../components/Leaderboard';
 import { sound } from '../lib/sound';
+import { uploadFile, uploadJson, mintNft } from '../lib/mint';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
@@ -24,35 +25,6 @@ const STEPS = [
   { key: 'upload-meta',  label: 'Enviando dados',    icon: '📄' },
   { key: 'minting',      label: 'Mintando NFT',      icon: '⛓️' },
 ];
-
-// ── Upload helpers (base64 → /api/upload) ──
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
-async function uploadFile(file) {
-  const base64 = await fileToBase64(file);
-  const res = await fetch('/api/upload', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'image', data: base64, filename: file.name || 'arte.jpg', mime: file.type || 'image/jpeg' }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`Upload imagem: ${json.error || res.status}`);
-  return json.url;
-}
-async function uploadJson(obj) {
-  const res = await fetch('/api/upload', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'json', data: obj }),
-  });
-  const json = await res.json();
-  if (!res.ok) throw new Error(`Upload dados: ${json.error || res.status}`);
-  return json.url;
-}
 
 // ── Metadados Metaplex ──
 function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, artistWallet, network }) {
@@ -74,64 +46,6 @@ function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, arti
       creators: [{ address: artistWallet, share: 100 }],
     },
   };
-}
-
-// ── Mint via Helius RPC proxy ──
-async function mintUrbanArt({ wallet, metadataUri, name }) {
-  const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
-  const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
-  const { mplTokenMetadata, createNft, fetchDigitalAsset } = await import('@metaplex-foundation/mpl-token-metadata');
-  const { generateSigner, percentAmount } = await import('@metaplex-foundation/umi');
-  const { setComputeUnitPrice } = await import('@metaplex-foundation/mpl-toolbox');
-
-  const rpcUrl = `${window.location.origin}/api/rpc`;
-  const umi = createUmi(rpcUrl).use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
-
-  const mintSigner = generateSigner(umi);
-  const ownerPublicKey = umi.identity.publicKey;
-
-  let builder = createNft(umi, {
-    mint: mintSigner, name, symbol: 'URBAN', uri: metadataUri,
-    sellerFeeBasisPoints: percentAmount(5), isMutable: true,
-    tokenOwner: ownerPublicKey,
-  });
-
-  // Taxa de prioridade — acelera inclusão no bloco
-  try { builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 })); } catch {}
-
-  // Verifica se o NFT já existe on-chain (polling até 20s)
-  async function nftExiste() {
-    try { await fetchDigitalAsset(umi, mintSigner.publicKey); return true; }
-    catch { return false; }
-  }
-  async function aguardarConfirmacao(tentativas = 10) {
-    for (let i = 0; i < tentativas; i++) {
-      await new Promise(r => setTimeout(r, 2000)); // 2s entre checagens
-      if (await nftExiste()) return true;
-    }
-    return false;
-  }
-
-  // Envia a transação. Se a confirmação automática falhar por timeout,
-  // fazemos polling manual — porque o NFT frequentemente confirma depois.
-  try {
-    await builder.sendAndConfirm(umi, {
-      confirm: { commitment: 'confirmed' },
-      send:    { skipPreflight: true, maxRetries: 5, commitment: 'confirmed' },
-    });
-    // Sucesso direto
-    return mintSigner.publicKey.toString();
-  } catch (err) {
-    const msg = String(err?.message || '');
-    // Erros que NÃO são timeout → falha real, repassa
-    if (msg.includes('insufficient') || msg.includes('rejected') || msg.includes('0x1')) {
-      throw err;
-    }
-    // Timeout / blockhash expirado → verifica de verdade se foi mintado
-    const ok = await aguardarConfirmacao(10); // até ~20s
-    if (ok) return mintSigner.publicKey.toString();
-    throw new Error('Não foi possível confirmar o mint. Tente novamente.');
-  }
 }
 
 export default function Home() {
@@ -179,6 +93,25 @@ export default function Home() {
   const [mintResult, setMintResult] = useState(null);
 
   const handleLocationUpdate = useCallback(d => setGps(d), []);
+
+  // Mede a altura real do carrossel (0 quando não há artes) e expõe via CSS var
+  // pra elementos flutuantes (.search-float, .map-counter) nunca sobreporem
+  // nem deixarem espaço morto abaixo dele. Usa ref callback porque o carrossel
+  // desmonta (retorna null) quando não há artes — o próprio unmount já zera a altura.
+  const carouselRoRef = useRef(null);
+  const setCarouselRef = useCallback((node) => {
+    if (carouselRoRef.current) { carouselRoRef.current.disconnect(); carouselRoRef.current = null; }
+    if (typeof document === 'undefined') return;
+    if (node && typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        document.documentElement.style.setProperty('--carousel-h', `${node.offsetHeight}px`);
+      });
+      ro.observe(node);
+      carouselRoRef.current = ro;
+    } else {
+      document.documentElement.style.setProperty('--carousel-h', '0px');
+    }
+  }, []);
 
   const artsFiltradas = busca.trim()
     ? arts.filter(a => {
@@ -232,7 +165,7 @@ export default function Home() {
       const metadataUri = await uploadJson(metadata);
 
       setMintStep('minting');
-      const mintAddress = await mintUrbanArt({ wallet, metadataUri, name: nftName });
+      const mintAddress = await mintNft({ wallet, metadataUri, name: nftName });
 
       setMintResult({
         address: mintAddress,
@@ -322,8 +255,8 @@ export default function Home() {
         <main className="map-stage">
           <MapView onReady={handleMapReady} onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
 
-          {/* Carrossel de artes registradas (topo) */}
-          <ArtCarousel arts={artsFiltradas} onSelect={handleSelectArt} />
+          {/* Carrossel de artes registradas (topo) — altura medida via ResizeObserver acima */}
+          <ArtCarousel ref={setCarouselRef} arts={artsFiltradas} onSelect={handleSelectArt} />
 
           {/* Busca flutuante */}
           <div className="search-float">
