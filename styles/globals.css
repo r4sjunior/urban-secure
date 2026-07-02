@@ -300,3 +300,34 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 @media (min-width:768px){
   .feed-panel{max-width:480px;left:50%;transform:translateX(-50%);border-left:1px solid var(--border);border-right:1px solid var(--border)}
 }
+
+/* ── Leaderboard ── */
+.lb-modal{position:fixed;inset:0;z-index:1800}
+.lb-backdrop{position:absolute;inset:0;background:rgba(5,6,8,.7);backdrop-filter:blur(4px)}
+.lb-panel{position:absolute;inset:0;background:var(--bg-1);display:flex;flex-direction:column;animation:slideUp .3s cubic-bezier(.16,1,.3,1)}
+.lb-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;padding:14px 18px;padding-top:max(14px,env(safe-area-inset-top));border-bottom:1px solid var(--border);background:var(--bg-1)}
+.lb-title{font-family:'Space Grotesk';font-size:19px;font-weight:700}
+.lb-close{width:36px;height:36px;border-radius:50%;background:var(--bg-2);border:1px solid var(--border-2);color:var(--text);font-size:14px;cursor:pointer;transition:border-color .2s,transform .15s}
+.lb-close:hover{border-color:var(--accent-bd)}
+.lb-close:active{transform:scale(.92)}
+.lb-loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:13px}
+.lb-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px max(24px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
+.lb-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r-md);background:var(--bg-2);border:1px solid var(--border)}
+.lb-row.lb-top{border-color:var(--accent-bd)}
+.lb-row.lb-top-1{background:linear-gradient(90deg,rgba(251,191,36,.14),var(--bg-2) 65%);border-color:rgba(251,191,36,.45)}
+.lb-row.lb-top-2{background:linear-gradient(90deg,rgba(203,213,225,.12),var(--bg-2) 65%);border-color:rgba(203,213,225,.4)}
+.lb-row.lb-top-3{background:linear-gradient(90deg,rgba(217,119,6,.14),var(--bg-2) 65%);border-color:rgba(217,119,6,.4)}
+.lb-rank{width:28px;flex-shrink:0;text-align:center;font-family:'Space Grotesk';font-size:14px;font-weight:700;color:var(--muted)}
+.lb-top .lb-rank{font-size:19px}
+.lb-thumb{width:42px;height:42px;flex-shrink:0;border-radius:var(--r-sm);overflow:hidden;background:var(--bg-3);display:flex;align-items:center;justify-content:center;font-size:18px}
+.lb-thumb img{width:100%;height:100%;object-fit:cover}
+.lb-info{flex:1;display:flex;flex-direction:column;min-width:0;gap:1px}
+.lb-name{font-family:'Space Grotesk';font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-artist{font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-likes{flex-shrink:0;font-size:12px;font-weight:600;color:var(--danger);font-family:'Space Grotesk'}
+.lb-locate{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--bg-3);border:1px solid var(--border-2);color:var(--text);font-size:13px;cursor:pointer;transition:border-color .2s,transform .15s}
+.lb-locate:hover{border-color:var(--accent-bd)}
+.lb-locate:active{transform:scale(.9)}
+@media (min-width:768px){
+  .lb-panel{max-width:480px;left:50%;transform:translateX(-50%);border-left:1px solid var(--border);border-right:1px solid var(--border)}
+}

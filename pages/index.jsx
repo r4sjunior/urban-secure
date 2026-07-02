@@ -10,6 +10,7 @@ import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
 import SoundToggle from '../components/SoundToggle';
 import ArtFeed from '../components/ArtFeed';
+import Leaderboard from '../components/Leaderboard';
 import { sound } from '../lib/sound';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
@@ -148,6 +149,10 @@ export default function Home() {
     setFeedOpen(false);
     handleSelectArt(art);
   }, [handleSelectArt]);
+  const handleLeaderboardLocate = useCallback((art) => {
+    setLeaderboardOpen(false);
+    handleSelectArt(art);
+  }, [handleSelectArt]);
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -159,6 +164,7 @@ export default function Home() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
   const [isMinting, setIsMinting] = useState(false);
   const [mintStep, setMintStep] = useState(null);
@@ -297,6 +303,9 @@ export default function Home() {
             <button className="feed-toggle" onClick={() => { sound.play('click'); setFeedOpen(true); }} title="Feed" aria-label="Feed">
               🗞️
             </button>
+            <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Leaderboard" aria-label="Leaderboard">
+              🏆
+            </button>
             <SoundToggle />
           </div>
         </header>
@@ -332,6 +341,9 @@ export default function Home() {
 
         {/* Feed estilo Instagram com as últimas artes registradas */}
         <ArtFeed open={feedOpen} onClose={() => setFeedOpen(false)} arts={arts} onLocate={handleFeedLocate} isAuthenticated={isAuthenticated} />
+
+        {/* Leaderboard das 100 artes mais curtidas */}
+        <Leaderboard open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} arts={arts} onLocate={handleLeaderboardLocate} />
 
         {/* Bottom sheet do formulário */}
         <div className={`sheet ${sheetOpen ? 'open' : ''}`}>
