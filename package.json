@@ -9,7 +9,10 @@
   },
   "overrides": {
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "rpc-websockets": {
+      "uuid": "^9.0.0"
+    }
   },
   "dependencies": {
     "@metaplex-foundation/mpl-token-metadata": "3.4.0",
