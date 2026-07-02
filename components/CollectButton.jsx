@@ -14,7 +14,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { payForCollect, getCollectPriceSol, COLLECT_TIERS } from '../lib/collectPayment';
 import { uploadJson, mintNft } from '../lib/mint';
 
-const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECT_WINDOW_MS = 20 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de mergear
 
 function formatRemaining(ms) {
   if (ms <= 0) return null;
