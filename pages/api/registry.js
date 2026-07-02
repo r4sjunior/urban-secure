@@ -5,8 +5,31 @@
  * POST → adiciona uma arte ao índice (valida formato e propriedade do NFT)
  */
 
+import nacl from 'tweetnacl';
+import bs58 from 'bs58';
+import { buildRegistryMessage } from '../../lib/registrySignature';
+
 const REGISTRY_NAME  = 'urban-secure-registry-v1';
 const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+// Janela de tolerância para o timestamp assinado — evita reuso de assinaturas antigas
+const SIGNATURE_WINDOW_MS = 10 * 60 * 1000;
+
+// Verifica que quem está registrando é o dono real da wallet `artistWallet`:
+// a assinatura precisa corresponder à mensagem (id + wallet + timestamp) assinada no cliente.
+function verifyArtistSignature({ id, artistWallet, timestamp, signature }) {
+  try {
+    const sigBytes = Buffer.from(signature, 'base64');
+    if (sigBytes.length !== 64) return false;
+    const pubkeyBytes = bs58.decode(artistWallet);
+    if (pubkeyBytes.length !== 32) return false;
+    const message = buildRegistryMessage({ id, artistWallet, timestamp });
+    const msgBytes = new TextEncoder().encode(message);
+    return nacl.sign.detached.verify(msgBytes, sigBytes, pubkeyBytes);
+  } catch {
+    return false;
+  }
+}
 
 // Remove caracteres que poderiam ser usados para injeção de HTML/scripts
 function sanitize(val, maxLen) {
@@ -77,6 +100,20 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Endereço de artista inválido.' });
       }
 
+      // Timestamp assinado — precisa ser numérico e recente (evita replay de assinaturas antigas)
+      const timestamp = body.timestamp;
+      if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > SIGNATURE_WINDOW_MS) {
+        return res.status(400).json({ error: 'Timestamp inválido ou expirado. Tente registrar novamente.' });
+      }
+
+      // Assinatura da wallet do artista — prova que quem está registrando é o dono da carteira
+      if (typeof body.signature !== 'string' || !body.signature) {
+        return res.status(401).json({ error: 'Assinatura da carteira ausente.' });
+      }
+      if (!verifyArtistSignature({ id: body.id, artistWallet: body.artistWallet, timestamp, signature: body.signature })) {
+        return res.status(401).json({ error: 'Assinatura inválida — a carteira não confirmou este registro.' });
+      }
+
       // Valida coordenadas GPS com faixas realistas
       const lat = parseFloat(body.lat);
       const lng = parseFloat(body.lng);
@@ -97,9 +134,7 @@ export default async function handler(req, res) {
         lng,
         imageUrl,
         artistWallet: body.artistWallet,
-        timestamp:    typeof body.timestamp === 'number' && body.timestamp > 0
-                        ? body.timestamp
-                        : Date.now(),
+        timestamp,
       };
 
       // Em mainnet, verifica que o NFT pertence à wallet declarada

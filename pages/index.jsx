@@ -5,9 +5,11 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import { resizeImage } from '../lib/resizeImage';
+import { buildRegistryMessage } from '../lib/registrySignature';
 import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
 import SoundToggle from '../components/SoundToggle';
+import ArtFeed from '../components/ArtFeed';
 import { sound } from '../lib/sound';
 
 const MapView      = dynamic(() => import('../components/MapView'),      { ssr: false, loading: () => <div className="map-skeleton" /> });
@@ -142,6 +144,10 @@ export default function Home() {
     sound.play('click');
     if (mapRef.current?.focusArt) mapRef.current.focusArt(art);
   }, []);
+  const handleFeedLocate = useCallback((art) => {
+    setFeedOpen(false);
+    handleSelectArt(art);
+  }, [handleSelectArt]);
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -152,6 +158,7 @@ export default function Home() {
   const [booting, setBooting] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(false);
 
   const [isMinting, setIsMinting] = useState(false);
   const [mintStep, setMintStep] = useState(null);
@@ -224,13 +231,24 @@ export default function Home() {
       const novaArte = { id: mintAddress, name: nftName, artistName: nome, description: descricao, lat: gps.lat, lng: gps.lng, imageUrl: imageUri, artistWallet, timestamp: Date.now() };
       addArt(novaArte);
 
-      // Registra no índice do Pinata para que TODOS vejam (contorna devnet)
+      // Registra no índice do Pinata para que TODOS vejam (contorna devnet).
+      // O servidor exige a assinatura da wallet provando autoria deste registro.
       try {
-        await fetch('/api/registry', {
+        let signature = '';
+        if (wallet.signMessage) {
+          const message = buildRegistryMessage({ id: novaArte.id, artistWallet: novaArte.artistWallet, timestamp: novaArte.timestamp });
+          const sigBytes = await wallet.signMessage(new TextEncoder().encode(message));
+          signature = Buffer.from(sigBytes).toString('base64');
+        }
+        const rReg = await fetch('/api/registry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(novaArte),
+          body: JSON.stringify({ ...novaArte, signature }),
         });
+        if (!rReg.ok) {
+          const j = await rReg.json().catch(() => ({}));
+          console.error('[registry]', j.error || rReg.status);
+        }
       } catch (e) { console.error('[registry]', e); }
     } catch (err) {
       console.error('[handleMint]', err);
@@ -276,6 +294,9 @@ export default function Home() {
             <div className={`gps-chip ${gpsClass}`}>
               <span className="gps-led" />{gpsLabel}
             </div>
+            <button className="feed-toggle" onClick={() => { sound.play('click'); setFeedOpen(true); }} title="Feed" aria-label="Feed">
+              🗞️
+            </button>
             <SoundToggle />
           </div>
         </header>
@@ -308,6 +329,9 @@ export default function Home() {
 
         {/* Modal de transferência */}
         <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
+
+        {/* Feed estilo Instagram com as últimas artes registradas */}
+        <ArtFeed open={feedOpen} onClose={() => setFeedOpen(false)} arts={arts} onLocate={handleFeedLocate} isAuthenticated={isAuthenticated} />
 
         {/* Bottom sheet do formulário */}
         <div className={`sheet ${sheetOpen ? 'open' : ''}`}>
