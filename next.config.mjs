@@ -34,7 +34,9 @@ const nextConfig = {
       "font-src 'self' https://fonts.gstatic.com",
       `img-src ${imgSrc}`,
       `connect-src ${connectSrc}`,
-      "frame-src https://audius.co",
+      // Trilha de fundo via API de streaming do Audius (<audio>, não iframe)
+      "media-src 'self' https://api.audius.co",
+      "frame-src 'none'",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",
