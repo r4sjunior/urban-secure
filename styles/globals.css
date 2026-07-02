@@ -242,6 +242,16 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .collect-tier-btn:disabled{opacity:.5;cursor:not-allowed}
 .collect-count-label{font-size:11px;color:var(--muted);font-family:'Space Grotesk'}
 
+.collect-offers-owner{display:flex;flex-direction:column;gap:6px}
+.collect-offer-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;border-radius:var(--r-sm);background:var(--bg-2);border:1px solid var(--border)}
+.collect-offer-info{font-size:11px;color:var(--text);font-family:'Space Grotesk';flex:1;min-width:120px}
+.collect-offer-accept,.collect-offer-reject{padding:4px 9px;border-radius:var(--r-sm);font-family:'Space Grotesk';font-size:11px;font-weight:700;cursor:pointer;transition:.2s;border:1px solid transparent}
+.collect-offer-accept{background:var(--accent-dim);border-color:var(--accent-bd);color:var(--accent)}
+.collect-offer-accept:hover:not(:disabled){background:var(--accent);color:var(--bg-1)}
+.collect-offer-reject{background:var(--bg-3);border-color:rgba(251,113,133,.4);color:var(--danger)}
+.collect-offer-reject:hover:not(:disabled){background:var(--danger);color:var(--bg-1)}
+.collect-offer-accept:disabled,.collect-offer-reject:disabled{opacity:.5;cursor:not-allowed}
+
 /* ── Comentários ── */
 .comments-section{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
 .comments-toggle{background:none;border:none;color:var(--muted);font-family:'Space Grotesk';font-size:12px;font-weight:600;cursor:pointer;padding:0}

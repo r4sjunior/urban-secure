@@ -8,17 +8,21 @@
  * Regras (nunca confiar no client):
  *  - Nas primeiras 24h depois do registro da obra, só a coleta padrão (tier=1)
  *    é aceita, pelo preço base.
- *  - Depois de 24h, a coleta padrão fecha e só lances nos múltiplos fixos de
- *    COLLECT_TIERS (5x/10x/20x/50x do preço base) são aceitos — sem prazo
- *    final: é compra instantânea no valor do tier, não leilão com vencedor.
+ *  - Depois de 24h, a coleta padrão fecha e os lances (5x/10x/20x/50x) só
+ *    podem ser pagos/mintados se existir uma PROPOSTA ACEITA (ver
+ *    /api/offers) daquela wallet, naquele tier, pra essa obra — proposta é
+ *    feita e aceita/recusada pelo dono da obra antes de qualquer dinheiro
+ *    trocar de mãos.
  *  - O artista não pode coletar a própria obra.
  *  - O pagamento precisa existir on-chain, ser assinado pela wallet que está
  *    coletando, e pagar pelo menos o preço do tier escolhido para o artista.
- *  - Sem limite de coletas por wallet (pode coletar a mesma obra várias vezes).
+ *  - Sem limite de coletas por wallet (pode coletar a mesma obra várias vezes,
+ *    cada tier > 1 exige uma nova proposta aceita).
  */
 
 import { getLatestPin, savePin } from '../../lib/pinataStore';
 import { getRegistryArts } from './registry';
+import { getOffers, saveOffers } from './offers';
 
 const COLLECTS_REGISTRY_NAME = 'urban-secure-collects-v1';
 const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -148,10 +152,22 @@ async function handleCollects(req, res) {
 
       const expired = Date.now() - art.timestamp > COLLECT_WINDOW_MS;
       if (tier === 1 && expired) {
-        return res.status(409).json({ error: 'Janela de coleta padrão expirada — escolha um lance (5x/10x/20x/50x).' });
+        return res.status(409).json({ error: 'Janela de coleta padrão expirada — proponha um lance (5x/10x/20x/50x).' });
       }
       if (tier !== 1 && !expired) {
         return res.status(409).json({ error: 'Lances só ficam disponíveis depois que a coleta padrão de 24h expira.' });
+      }
+
+      // Lance (tier > 1) exige uma proposta aceita pelo dono da obra pra
+      // essa wallet+tier — nunca aceito sem essa aprovação prévia.
+      let offers, matchedOffer;
+      if (tier !== 1) {
+        offers = await getOffers(jwt);
+        const offerList = offers[postId] || [];
+        matchedOffer = offerList.find(o => o.buyerWallet === wallet && o.tier === tier && o.status === 'accepted');
+        if (!matchedOffer) {
+          return res.status(403).json({ error: 'Não há proposta aceita pelo dono da obra pra essa wallet e tier. Proponha um lance e aguarde a aprovação.' });
+        }
       }
 
       const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
@@ -173,6 +189,12 @@ async function handleCollects(req, res) {
 
       const saved = await savePin(jwt, COLLECTS_REGISTRY_NAME, collects);
       if (!saved) return res.status(502).json({ error: 'Falha ao salvar coleta.' });
+
+      // Consome a proposta usada — cada aceite do dono vale por uma coleta
+      if (matchedOffer) {
+        matchedOffer.status = 'completed';
+        await saveOffers(jwt, offers);
+      }
 
       return res.status(200).json({ ok: true, count: list.length });
     } catch (err) {
