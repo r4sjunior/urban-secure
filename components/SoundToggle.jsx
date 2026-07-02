@@ -1,26 +1,10 @@
 /**
  * components/SoundToggle.jsx
- * Botão visível para ligar/desligar som (SFX + música).
- * Ao ligar, inicia o AudioContext e a trilha pulsante.
+ * Botão visível para ligar/desligar som — controla SFX e o player do Audius.
+ * Estado (muted) é controlado pelo componente pai (pages/index.jsx) para
+ * ficar em sincronia com o AudiusPlayer.
  */
-import { useState } from 'react';
-import { sound } from '../lib/sound';
-
-export default function SoundToggle() {
-  const [muted, setMuted] = useState(() => typeof window !== 'undefined' ? sound.isMuted() : true);
-
-  const onToggle = () => {
-    const nowMuted = sound.toggleMute();
-    setMuted(nowMuted);
-    if (!nowMuted) {
-      // ligou: inicia trilha e dá um feedback sonoro
-      sound.startMusic();
-      sound.play('click');
-    } else {
-      sound.stopMusic();
-    }
-  };
-
+export default function SoundToggle({ muted, onToggle }) {
   return (
     <button
       className={`sound-toggle${muted ? ' off' : ''}`}

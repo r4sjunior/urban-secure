@@ -271,6 +271,13 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .feed-toggle:active{transform:scale(.92)}
 @media (max-width:360px){.feed-toggle{width:36px;height:36px;font-size:14px}}
 
+/* ── Player Audius (discreto, some ao mutar) ── */
+.audius-embed{width:150px;height:24px;flex-shrink:0;border-radius:6px;overflow:hidden;opacity:.85;transition:opacity .2s}
+.audius-embed:hover{opacity:1}
+.audius-embed iframe{display:block}
+@media (max-width:520px){.audius-embed{width:110px}}
+@media (max-width:400px){.audius-embed{display:none}}
+
 /* ── Feed estilo Instagram ── */
 .feed-modal{position:fixed;inset:0;z-index:1800}
 .feed-backdrop{position:absolute;inset:0;background:rgba(5,6,8,.7);backdrop-filter:blur(4px)}

@@ -63,11 +63,6 @@ export default function BootScreen({ onDone }) {
     onDone && onDone();
   };
 
-  // Inicia a trilha no primeiro gesto do usuário (respeita autoplay-block).
-  const kickAudio = () => {
-    if (!sound.isMuted()) sound.startMusic();
-  };
-
   useEffect(() => {
     let acc = 0;
     LINES.forEach((line, i) => {
@@ -102,7 +97,7 @@ export default function BootScreen({ onDone }) {
   }, [shown]);
 
   return (
-    <div className="boot" onClick={() => { kickAudio(); finish(); }} role="button" title="Clique para pular" onMouseDown={kickAudio} onTouchStart={kickAudio}>
+    <div className="boot" onClick={finish} role="button" title="Clique para pular">
       <div className="boot-scanlines" />
       <button className="boot-skip" onClick={(e) => { e.stopPropagation(); finish(); }}>skip ▶</button>
 

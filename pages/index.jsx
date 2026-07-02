@@ -9,6 +9,7 @@ import { buildRegistryMessage } from '../lib/registrySignature';
 import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
 import SoundToggle from '../components/SoundToggle';
+import AudiusPlayer from '../components/AudiusPlayer';
 import ArtFeed from '../components/ArtFeed';
 import Leaderboard from '../components/Leaderboard';
 import { sound } from '../lib/sound';
@@ -153,6 +154,11 @@ export default function Home() {
     setLeaderboardOpen(false);
     handleSelectArt(art);
   }, [handleSelectArt]);
+  const handleToggleSound = useCallback(() => {
+    const nowMuted = sound.toggleMute();
+    setMuted(nowMuted);
+    if (!nowMuted) sound.play('click');
+  }, []);
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -165,6 +171,7 @@ export default function Home() {
   const [transferOpen, setTransferOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [muted, setMuted] = useState(() => (typeof window !== 'undefined' ? sound.isMuted() : true));
 
   const [isMinting, setIsMinting] = useState(false);
   const [mintStep, setMintStep] = useState(null);
@@ -306,7 +313,8 @@ export default function Home() {
             <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Leaderboard" aria-label="Leaderboard">
               🏆
             </button>
-            <SoundToggle />
+            <AudiusPlayer muted={muted} />
+            <SoundToggle muted={muted} onToggle={handleToggleSound} />
           </div>
         </header>
 

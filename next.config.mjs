@@ -34,7 +34,7 @@ const nextConfig = {
       "font-src 'self' https://fonts.gstatic.com",
       `img-src ${imgSrc}`,
       `connect-src ${connectSrc}`,
-      "frame-src 'none'",
+      "frame-src https://audius.co",
       "frame-ancestors 'none'",
       "object-src 'none'",
       "base-uri 'self'",
