@@ -198,6 +198,24 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .transfer-item-check{color:var(--accent);font-size:18px;font-weight:700;flex-shrink:0}
 .transfer-ok{background:var(--accent-dim);border:1px solid var(--accent-bd);border-radius:var(--r-md);padding:10px 13px;font-size:13px;color:var(--accent);margin-bottom:10px}
 
+/* ── Mercado de revenda ── */
+.market-modal{position:fixed;inset:0;z-index:1500}
+.market-backdrop{position:absolute;inset:0;background:rgba(5,6,8,.6);backdrop-filter:blur(4px)}
+.market-panel{position:absolute;bottom:0;left:0;right:0;background:var(--bg-1);border-top:1px solid var(--border-2);border-radius:var(--r-xl) var(--r-xl) 0 0;padding:8px 18px 24px;padding-bottom:max(24px,env(safe-area-inset-bottom));max-height:88dvh;overflow-y:auto;animation:slideUp .35s cubic-bezier(.16,1,.3,1)}
+.market-tabs{display:flex;gap:8px;margin-bottom:14px}
+.market-tab{flex:1;padding:10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--bg-2);color:var(--muted);font-family:'Space Grotesk';font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.market-tab.active{border-color:var(--accent-bd);background:var(--accent-dim);color:var(--accent)}
+.market-list{display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto}
+.market-section-label{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 2px;font-family:'Space Grotesk'}
+.market-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--r-md);background:var(--bg-2);border:1px solid var(--border)}
+.market-item-price{font-size:12px;color:var(--accent);font-family:'Space Grotesk';font-weight:700}
+.market-price-input{width:100%;margin-top:4px;padding:7px 9px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:12px;font-family:'Inter';outline:none}
+.market-action-btn{flex-shrink:0;padding:9px 14px;border-radius:var(--r-sm);border:none;background:var(--accent);color:#04201C;font-family:'Space Grotesk';font-size:12px;font-weight:700;cursor:pointer;transition:filter .2s}
+.market-action-btn:hover:not(:disabled){filter:brightness(1.08)}
+.market-action-btn:disabled{opacity:.6;cursor:wait}
+.market-action-btn.cancel{background:var(--bg-3);color:var(--danger);border:1px solid rgba(251,113,133,.4)}
+@media (min-width:768px){.market-panel{max-width:480px;left:50%;transform:translateX(-50%);border-radius:var(--r-xl);bottom:20px}}
+
 .like-button-wrap{display:flex;flex-direction:column;gap:4px;margin-top:8px}
 .like-btn{padding:6px 12px;border-radius:var(--r-sm);border:1px solid var(--border-2);background:var(--bg-3);color:var(--text);font-family:'Space Grotesk';font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
 .like-btn:hover:not(:disabled){border-color:var(--danger);color:var(--danger)}
@@ -215,6 +233,14 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .collect-btn.expired{opacity:.5;cursor:not-allowed}
 .collect-btn:disabled{opacity:.5;cursor:not-allowed}
 .collect-countdown{font-size:11px;color:var(--amber);font-family:'Space Grotesk'}
+
+.collect-tiers{display:flex;flex-direction:column;gap:5px}
+.collect-tiers-label{font-size:11px;color:var(--amber);font-family:'Space Grotesk'}
+.collect-tiers-row{display:flex;gap:6px;flex-wrap:wrap}
+.collect-tier-btn{padding:5px 10px;border-radius:var(--r-sm);border:1px solid var(--accent-bd);background:var(--accent-dim);color:var(--accent);font-family:'Space Grotesk';font-size:12px;font-weight:700;cursor:pointer;transition:.2s}
+.collect-tier-btn:hover:not(:disabled){background:var(--accent);color:var(--bg-1)}
+.collect-tier-btn:disabled{opacity:.5;cursor:not-allowed}
+.collect-count-label{font-size:11px;color:var(--muted);font-family:'Space Grotesk'}
 
 /* ── Comentários ── */
 .comments-section{margin-top:12px;border-top:1px solid var(--border);padding-top:10px}
@@ -311,25 +337,45 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .feed-close{width:36px;height:36px;border-radius:50%;background:var(--bg-2);border:1px solid var(--border-2);color:var(--text);font-size:14px;cursor:pointer;transition:border-color .2s,transform .15s}
 .feed-close:hover{border-color:var(--accent-bd)}
 .feed-close:active{transform:scale(.92)}
-.feed-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px max(24px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+.feed-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:max(24px,env(safe-area-inset-bottom))}
 .feed-empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;line-height:1.5}
-.feed-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
-.feed-card-head{display:flex;align-items:center;gap:10px;padding:12px 14px}
-.feed-avatar{width:34px;height:34px;flex-shrink:0;border-radius:50%;background:var(--accent-dim);border:1px solid var(--accent-bd);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:14px}
+
+/* Cards em largura total, sem cantos arredondados, separados por um divisor
+   grosso (como o feed real do Instagram) em vez de gap + card flutuante. */
+.feed-card{border-bottom:8px solid var(--bg);background:var(--bg-1)}
+.feed-card-head{display:flex;align-items:center;gap:10px;padding:11px 14px}
+.feed-avatar{width:34px;height:34px;flex-shrink:0;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--violet));padding:2px}
+.feed-avatar span{width:100%;height:100%;border-radius:50%;background:var(--bg-2);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:700;font-size:13px}
 .feed-card-headinfo{flex:1;display:flex;flex-direction:column;min-width:0;gap:1px}
 .feed-artist{font-family:'Space Grotesk';font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .feed-time{font-size:11px;color:var(--faint)}
-.feed-locate{width:36px;height:36px;flex-shrink:0;border-radius:50%;background:var(--bg-3);border:1px solid var(--border-2);color:var(--text);font-size:15px;cursor:pointer;transition:border-color .2s,transform .15s}
-.feed-locate:hover{border-color:var(--accent-bd)}
-.feed-locate:active{transform:scale(.9)}
-.feed-media{width:100%;max-height:70vh;background:var(--bg-3);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.feed-media img{width:100%;height:auto;max-height:70vh;object-fit:contain;display:block}
+.feed-locate{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:transparent;border:none;color:var(--muted);font-size:16px;cursor:pointer;transition:color .2s,transform .15s;display:flex;align-items:center;justify-content:center}
+.feed-locate:hover{color:var(--accent)}
+.feed-locate:active{transform:scale(.88)}
+
+/* Imagem sempre inteira (object-fit:contain), moldura quadrada fixa pra
+   manter o ritmo do scroll — igual ao "modo foto" do Instagram. */
+.feed-media{width:100%;aspect-ratio:1/1;background:var(--bg-2);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.feed-media img{width:100%;height:100%;object-fit:contain;display:block}
 .feed-media-ph{font-size:44px;opacity:.5}
-.feed-card-body{padding:10px 14px 14px}
-.feed-actions{display:flex;gap:14px;flex-wrap:wrap}
+
+.feed-card-body{padding:8px 14px 16px}
+.feed-actions{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px 2px;margin:0 0 2px -8px}
 .feed-actions .like-button-wrap,.feed-actions .collect-button-wrap{margin-top:0}
-.feed-desc{font-size:13px;color:#B6BECB;line-height:1.5;margin-top:8px}
+.feed-desc{font-size:13px;color:#B6BECB;line-height:1.5;margin-top:4px}
 .feed-desc strong{color:var(--text);font-family:'Space Grotesk';margin-right:6px}
+
+/* Botões de like/coletar viram ícones "soltos" na linha de ação, sem caixa —
+   igual à barra de ações do Instagram (coração / mint / …). */
+.feed-actions .like-btn,.feed-actions .collect-btn{
+  background:transparent;border:none;padding:8px;border-radius:50%;
+  font-size:22px;line-height:1;
+}
+.feed-actions .like-btn:hover:not(:disabled),.feed-actions .collect-btn:hover:not(:disabled){background:var(--bg-2);border-color:transparent}
+.feed-actions .like-btn.liked,.feed-actions .collect-btn.collected{background:transparent}
+.feed-actions .like-price,.feed-actions .collect-countdown{font-size:10px;padding-left:8px}
+.feed-actions .like-error,.feed-actions .collect-button-wrap .like-error{padding-left:8px;max-width:120px}
+
 @media (min-width:768px){
   .feed-panel{max-width:480px;left:50%;transform:translateX(-50%);border-left:1px solid var(--border);border-right:1px solid var(--border)}
 }

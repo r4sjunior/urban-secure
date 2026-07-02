@@ -2,15 +2,18 @@
  * pages/api/collects.js
  * Registro de "coletas" (mint de edição pago) — Pinata/IPFS.
  * GET  ?postId=...                     → contagem de coletas de uma obra
- * POST { postId, wallet, tx, editionMintId } → registra coleta (após pagamento
- *       confirmado on-chain e mint da edição confirmado pelo cliente)
+ * POST { postId, wallet, tx, editionMintId, tier } → registra coleta (após
+ *       pagamento confirmado on-chain e mint da edição confirmado pelo cliente)
  *
  * Regras (nunca confiar no client):
- *  - Só é possível coletar até 24h depois do timestamp de registro da obra
- *    (lido do índice oficial em /api/registry, não do que o client mandar).
+ *  - Nas primeiras 24h depois do registro da obra, só a coleta padrão (tier=1)
+ *    é aceita, pelo preço base.
+ *  - Depois de 24h, a coleta padrão fecha e só lances nos múltiplos fixos de
+ *    COLLECT_TIERS (5x/10x/20x/50x do preço base) são aceitos — sem prazo
+ *    final: é compra instantânea no valor do tier, não leilão com vencedor.
  *  - O artista não pode coletar a própria obra.
  *  - O pagamento precisa existir on-chain, ser assinado pela wallet que está
- *    coletando, e pagar pelo menos o preço de coleta para o artista da obra.
+ *    coletando, e pagar pelo menos o preço do tier escolhido para o artista.
  *  - Sem limite de coletas por wallet (pode coletar a mesma obra várias vezes).
  */
 
@@ -19,6 +22,7 @@ import { getRegistryArts } from './registry';
 
 const COLLECTS_REGISTRY_NAME = 'urban-secure-collects-v1';
 const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const COLLECT_TIERS = [5, 10, 20, 50];
 
 const SOLANA_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 const SOLANA_TX_RE   = /^[1-9A-HJ-NP-Za-km-z]{86,90}$/;
@@ -32,7 +36,7 @@ async function getLatestCollects(jwt) {
  * Verifica que a transação existe on-chain, foi assinada pela wallet correta,
  * e pagou o artista o valor esperado da coleta.
  */
-async function verifyCollectPayment({ tx, wallet, artistWallet, network }) {
+async function verifyCollectPayment({ tx, wallet, artistWallet, network, tier }) {
   const apiKey = process.env.HELIUS_API_KEY;
   const cluster = network === 'mainnet-beta' ? 'mainnet' : 'devnet';
   const rpcUrl = apiKey
@@ -62,7 +66,7 @@ async function verifyCollectPayment({ tx, wallet, artistWallet, network }) {
   }
   if (parsed.meta?.err) return { ok: false, reason: 'Transação falhou on-chain.' };
 
-  const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_COLLECT_PRICE_SOL || '0.0012') * 1e9);
+  const priceLamports = Math.round(parseFloat(process.env.NEXT_PUBLIC_COLLECT_PRICE_SOL || '0.0012') * 1e9 * tier);
 
   const msg = parsed.transaction?.message;
   const instructions = msg?.instructions || [];
@@ -120,6 +124,7 @@ async function handleCollects(req, res) {
   if (req.method === 'POST') {
     try {
       const { postId, wallet, tx, editionMintId } = req.body || {};
+      const tier = Number(req.body?.tier ?? 1);
 
       if (!postId || !wallet || !tx || !editionMintId) {
         return res.status(400).json({ error: 'Dados inválidos.' });
@@ -128,6 +133,9 @@ async function handleCollects(req, res) {
       if (!SOLANA_ADDR_RE.test(wallet))        return res.status(400).json({ error: 'wallet inválida.' });
       if (!SOLANA_ADDR_RE.test(editionMintId)) return res.status(400).json({ error: 'editionMintId inválido.' });
       if (!SOLANA_TX_RE.test(tx))              return res.status(400).json({ error: 'Assinatura de transação inválida.' });
+      if (tier !== 1 && !COLLECT_TIERS.includes(tier)) {
+        return res.status(400).json({ error: 'Tier de lance inválido.' });
+      }
 
       // Busca a obra original no índice oficial — nunca confia no artistWallet do client
       const arts = await getRegistryArts(jwt);
@@ -138,8 +146,12 @@ async function handleCollects(req, res) {
         return res.status(403).json({ error: 'O artista não pode coletar a própria obra.' });
       }
 
-      if (Date.now() - art.timestamp > COLLECT_WINDOW_MS) {
-        return res.status(409).json({ error: 'Janela de coleta expirada — só é possível coletar até 24h após o registro.' });
+      const expired = Date.now() - art.timestamp > COLLECT_WINDOW_MS;
+      if (tier === 1 && expired) {
+        return res.status(409).json({ error: 'Janela de coleta padrão expirada — escolha um lance (5x/10x/20x/50x).' });
+      }
+      if (tier !== 1 && !expired) {
+        return res.status(409).json({ error: 'Lances só ficam disponíveis depois que a coleta padrão de 24h expira.' });
       }
 
       const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
@@ -151,12 +163,12 @@ async function handleCollects(req, res) {
         return res.status(409).json({ error: 'Esta transação já foi usada para registrar uma coleta.' });
       }
 
-      const verification = await verifyCollectPayment({ tx, wallet, artistWallet: art.artistWallet, network });
+      const verification = await verifyCollectPayment({ tx, wallet, artistWallet: art.artistWallet, network, tier });
       if (!verification.ok) {
         return res.status(402).json({ error: `Pagamento não confirmado: ${verification.reason}` });
       }
 
-      list.push({ wallet, tx, editionMintId, timestamp: Date.now() });
+      list.push({ wallet, tx, editionMintId, tier, timestamp: Date.now() });
       collects[postId] = list;
 
       const saved = await savePin(jwt, COLLECTS_REGISTRY_NAME, collects);

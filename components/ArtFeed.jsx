@@ -34,7 +34,7 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
             return (
               <article className="feed-card" key={art.id}>
                 <div className="feed-card-head">
-                  <div className="feed-avatar">{initial}</div>
+                  <div className="feed-avatar"><span>{initial}</span></div>
                   <div className="feed-card-headinfo">
                     <span className="feed-artist">{art.artistName || 'Anônimo'}</span>
                     <span className="feed-time">{timeAgo(art.timestamp)}</span>

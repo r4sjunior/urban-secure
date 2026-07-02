@@ -3,53 +3,17 @@
  * Transfere um NFT URBAN da carteira conectada para outro endereço Solana.
  * Usa o proxy RPC (Helius) — mais confiável que o envio pelo Phantom.
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useMyNfts } from '../lib/useMyNfts';
+import { transferNft } from '../lib/nftTransfer';
 
 export default function TransferModal({ open, onClose }) {
   const wallet = useWallet();
-  const [nfts, setNfts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { nfts, loading, removeNft } = useMyNfts(wallet, open);
   const [selected, setSelected] = useState(null);
   const [destino, setDestino] = useState('');
   const [status, setStatus] = useState(null); // null | 'sending' | 'ok' | erro string
-
-  // Carrega os NFTs URBAN da carteira conectada
-  useEffect(() => {
-    if (!open || !wallet.publicKey) return;
-    let cancel = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
-        const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
-        const { mplTokenMetadata, fetchAllDigitalAssetWithTokenByOwner } = await import('@metaplex-foundation/mpl-token-metadata');
-
-        const umi = createUmi(`${window.location.origin}/api/rpc`)
-          .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
-
-        const assets = await fetchAllDigitalAssetWithTokenByOwner(umi, wallet.publicKey);
-        const urbanAssets = assets.filter(a => (a.metadata.symbol || '').trim() === 'URBAN');
-
-        // Busca a imagem de cada NFT no metadata JSON (IPFS)
-        const urban = await Promise.all(urbanAssets.map(async (a) => {
-          let imageUrl = '';
-          try {
-            const res = await fetch(a.metadata.uri);
-            const json = await res.json();
-            imageUrl = (json.image || '').startsWith('https://') ? json.image : '';
-          } catch {}
-          return { id: a.publicKey.toString(), name: a.metadata.name, uri: a.metadata.uri, imageUrl };
-        }));
-        if (!cancel) setNfts(urban);
-      } catch (err) {
-        console.error('[Transfer] load', err);
-      } finally {
-        if (!cancel) setLoading(false);
-      }
-    })();
-    return () => { cancel = true; };
-  }, [open, wallet.publicKey]);
 
   function validarEndereco(addr) {
     // Endereço Solana: base58, 32-44 chars
@@ -62,63 +26,10 @@ export default function TransferModal({ open, onClose }) {
 
     setStatus('sending');
     try {
-      const { createUmi } = await import('@metaplex-foundation/umi-bundle-defaults');
-      const { walletAdapterIdentity } = await import('@metaplex-foundation/umi-signer-wallet-adapters');
-      const { mplTokenMetadata, transferV1, fetchDigitalAsset, TokenStandard } = await import('@metaplex-foundation/mpl-token-metadata');
-      const { publicKey } = await import('@metaplex-foundation/umi');
-      const { setComputeUnitPrice } = await import('@metaplex-foundation/mpl-toolbox');
-
-      const umi = createUmi(`${window.location.origin}/api/rpc`)
-        .use(walletAdapterIdentity(wallet)).use(mplTokenMetadata());
-
-      const destPk = publicKey(destino.trim());
-      const asset = await fetchDigitalAsset(umi, publicKey(selected));
-
-      let ts = TokenStandard.NonFungible;
-      const onChainTs = asset?.metadata?.tokenStandard;
-      if (onChainTs && onChainTs.__option === 'Some') ts = onChainTs.value;
-
-      // Verifica se o NFT já saiu da carteira (transferência confirmada)
-      async function jaTransferiu() {
-        try {
-          const { fetchAllDigitalAssetWithTokenByOwner } = await import('@metaplex-foundation/mpl-token-metadata');
-          const restantes = await fetchAllDigitalAssetWithTokenByOwner(umi, umi.identity.publicKey);
-          return !restantes.some(a => a.publicKey.toString() === selected);
-        } catch { return false; }
-      }
-
-      // Blockhash fresco 'finalized' (janela maior)
-      const blockhash = await umi.rpc.getLatestBlockhash({ commitment: 'finalized' });
-
-      let builder = transferV1(umi, {
-        mint: publicKey(selected),
-        authority: umi.identity,
-        tokenOwner: umi.identity.publicKey,
-        destinationOwner: destPk,
-        tokenStandard: ts,
-      });
-      try { builder = builder.prepend(setComputeUnitPrice(umi, { microLamports: 200000 })); } catch {}
-      builder = builder.setBlockhash(blockhash);
-
-      try {
-        await builder.sendAndConfirm(umi, {
-          confirm: { commitment: 'confirmed' },
-          send: { skipPreflight: true, maxRetries: 5 },
-        });
-      } catch (errSend) {
-        const m = String(errSend?.message || '');
-        if (m.includes('expired') || m.includes('block height')) {
-          // Pode ter confirmado mesmo assim — verifica
-          await new Promise(r => setTimeout(r, 8000));
-          const ok = await jaTransferiu();
-          if (!ok) throw new Error('A confirmação demorou. Verifique sua carteira antes de tentar de novo.');
-        } else {
-          throw errSend;
-        }
-      }
+      await transferNft({ wallet, mint: selected, destination: destino.trim() });
 
       setStatus('ok');
-      setNfts(prev => prev.filter(n => n.id !== selected));
+      removeNft(selected);
       setSelected(null);
       setDestino('');
     } catch (err) {

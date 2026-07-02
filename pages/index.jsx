@@ -19,6 +19,7 @@ const MapView      = dynamic(() => import('../components/MapView'),      { ssr: 
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
 const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
 const TransferModal= dynamic(() => import('../components/TransferModal'),{ ssr: false });
+const MarketModal  = dynamic(() => import('../components/MarketModal'),  { ssr: false });
 
 const STEPS = [
   { key: 'upload-image', label: 'Enviando imagem',   icon: '🖼️' },
@@ -83,6 +84,7 @@ export default function Home() {
   const [booting, setBooting] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [muted, setMuted] = useState(() => (typeof window !== 'undefined' ? sound.isMuted() : true));
@@ -246,6 +248,9 @@ export default function Home() {
             <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Leaderboard" aria-label="Leaderboard">
               🏆
             </button>
+            <button className="feed-toggle" onClick={() => { sound.play('click'); setMarketOpen(true); }} title="Mercado" aria-label="Mercado">
+              🛒
+            </button>
             <AudiusPlayer muted={muted} />
             <SoundToggle muted={muted} onToggle={handleToggleSound} />
           </div>
@@ -279,6 +284,9 @@ export default function Home() {
 
         {/* Modal de transferência */}
         <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
+
+        {/* Mercado de revenda — comprar/vender artes já mintadas ou coletadas */}
+        <MarketModal open={marketOpen} onClose={() => setMarketOpen(false)} isAuthenticated={isAuthenticated} />
 
         {/* Feed estilo Instagram com as últimas artes registradas */}
         <ArtFeed open={feedOpen} onClose={() => setFeedOpen(false)} arts={arts} onLocate={handleFeedLocate} isAuthenticated={isAuthenticated} />

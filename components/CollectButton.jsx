@@ -3,11 +3,15 @@
  * Botão de "coletar" — paga o artista original (0,0012 SOL por padrão) e
  * minta uma EDIÇÃO da obra na carteira de quem coleta (não move o NFT
  * original, não cria pino novo no mapa). Só funciona nas primeiras 24h
- * depois do registro da obra — depois disso fica "Expirado".
+ * depois do registro da obra.
+ *
+ * Depois das 24h, a coleta padrão fecha e viram disponíveis lances em
+ * múltiplos fixos do preço base (5x/10x/20x/50x) — compra instantânea no
+ * valor do tier escolhido, sem disputa entre lances.
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { payForCollect, getCollectPriceSol } from '../lib/collectPayment';
+import { payForCollect, getCollectPriceSol, COLLECT_TIERS } from '../lib/collectPayment';
 import { uploadJson, mintNft } from '../lib/mint';
 
 const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -26,6 +30,7 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
   const wallet = injectedWallet || contextWallet;
   const [count, setCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
   const [error, setError] = useState(null);
   const [ok, setOk] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -53,20 +58,22 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
 
   const remainingLabel = useMemo(() => formatRemaining(remainingMs), [remainingMs]);
 
-  const handleCollect = useCallback(async () => {
+  const handleCollect = useCallback(async (tier) => {
     setError(null); setOk(false);
 
     if (!wallet.connected || !wallet.publicKey) { setError('Conecte sua carteira para coletar.'); return; }
     if (!isAuthenticated) { setError('Assine na carteira para coletar.'); return; }
     if (isOwnPost) { setError('Você não pode coletar a própria obra.'); return; }
-    if (expired) { setError('Janela de coleta expirada (24h).'); return; }
+    if (tier === 1 && expired) { setError('Coleta padrão expirada — escolha um lance.'); return; }
+    if (tier !== 1 && !expired) { setError('Lance só disponível após a coleta padrão expirar.'); return; }
 
-    setLoading(true);
+    setLoading(true); setPendingTier(tier);
     try {
-      const tx = await payForCollect(wallet, art.artistWallet);
+      const tx = await payForCollect(wallet, art.artistWallet, tier);
 
+      const isBid = tier !== 1;
       const metadata = {
-        name: `${art.name} — Edição Coletada`,
+        name: isBid ? `${art.name} — Edição Coletada (Lance ${tier}x)` : `${art.name} — Edição Coletada`,
         symbol: 'URBAN',
         description: art.description,
         image: art.imageUrl,
@@ -76,6 +83,7 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
           { trait_type: 'Longitude',  value: String(art.lng) },
           { trait_type: 'Categoria',  value: 'Arte Urbana — Edição' },
           { trait_type: 'Edição de',  value: art.id },
+          ...(isBid ? [{ trait_type: 'Lance', value: `${tier}x` }] : []),
         ],
         properties: {
           category: 'image',
@@ -89,7 +97,7 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
       const r = await fetch('/api/collects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postId: art.id, wallet: wallet.publicKey.toBase58(), tx, editionMintId }),
+        body: JSON.stringify({ postId: art.id, wallet: wallet.publicKey.toBase58(), tx, editionMintId, tier }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Falha ao registrar coleta.');
@@ -103,29 +111,55 @@ export default function CollectButton({ art, initialCount = 0, wallet: injectedW
       else if (msg.includes('rejected') || msg.includes('User rejected')) msg = 'Transação cancelada na carteira.';
       setError(msg);
     } finally {
-      setLoading(false);
+      setLoading(false); setPendingTier(null);
     }
   }, [wallet, isOwnPost, expired, isAuthenticated, art, count]);
 
+  const disabledBase = loading || isOwnPost;
+
   return (
     <div className="collect-button-wrap">
-      <button
-        className={`collect-btn ${expired ? 'expired' : ''} ${ok ? 'collected' : ''}`}
-        onClick={handleCollect}
-        disabled={loading || isOwnPost || expired}
-        title={
-          expired            ? 'Janela de coleta expirada (24h)' :
-          !wallet.connected  ? 'Conecte sua carteira para coletar' :
-          !isAuthenticated   ? 'Assine na carteira para coletar' :
-          isOwnPost          ? 'Você não pode coletar a própria obra' :
-          `Coletar por ${getCollectPriceSol()} SOL + gás`
-        }
-      >
-        {loading ? '⏳' : expired ? '⌛' : ok ? '✅' : '🪙'} {expired ? 'Expirado' : 'Coletar'} {count > 0 && `· ${count}`}
-      </button>
-      {!expired && remainingLabel && <span className="collect-countdown">{remainingLabel}</span>}
+      {!expired ? (
+        <button
+          className={`collect-btn ${ok ? 'collected' : ''}`}
+          onClick={() => handleCollect(1)}
+          disabled={disabledBase}
+          title={
+            !wallet.connected  ? 'Conecte sua carteira para coletar' :
+            !isAuthenticated   ? 'Assine na carteira para coletar' :
+            isOwnPost          ? 'Você não pode coletar a própria obra' :
+            `Coletar por ${getCollectPriceSol()} SOL + gás`
+          }
+        >
+          {loading ? '⏳' : ok ? '✅' : '🪙'} {count > 0 && count}
+        </button>
+      ) : (
+        <div className="collect-tiers">
+          <span className="collect-tiers-label">⌛ Coleta padrão encerrada — dar lance:</span>
+          <div className="collect-tiers-row">
+            {COLLECT_TIERS.map(t => (
+              <button
+                key={t}
+                className="collect-tier-btn"
+                onClick={() => handleCollect(t)}
+                disabled={disabledBase}
+                title={
+                  !wallet.connected  ? 'Conecte sua carteira para dar lance' :
+                  !isAuthenticated   ? 'Assine na carteira para dar lance' :
+                  isOwnPost          ? 'Você não pode dar lance na própria obra' :
+                  `Coletar por ${getCollectPriceSol(t)} SOL + gás`
+                }
+              >
+                {loading && pendingTier === t ? '⏳' : `${t}×`}
+              </button>
+            ))}
+          </div>
+          {count > 0 && <span className="collect-count-label">🪙 {count} coletados</span>}
+        </div>
+      )}
       {error && <div className="like-error">⚠️ {error}</div>}
       {!expired && !ok && <span className="like-price">{getCollectPriceSol()} SOL + gás do mint</span>}
+      {!expired && remainingLabel && <span className="collect-countdown">{remainingLabel}</span>}
     </div>
   );
 }
