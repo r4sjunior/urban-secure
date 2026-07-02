@@ -15,7 +15,7 @@ import { payForCollect, getCollectPriceSol, COLLECT_TIERS } from '../lib/collect
 import { uploadJson, mintNft } from '../lib/mint';
 import { safeJson } from '../lib/safeJson';
 
-const COLLECT_WINDOW_MS = 20 * 1000; // TESTE QA TEMPORARIO — reverter para 24h antes de mergear
+const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function formatRemaining(ms) {
   if (ms <= 0) return null;
