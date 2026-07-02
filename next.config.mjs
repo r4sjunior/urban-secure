@@ -34,8 +34,11 @@ const nextConfig = {
       "font-src 'self' https://fonts.gstatic.com",
       `img-src ${imgSrc}`,
       `connect-src ${connectSrc}`,
-      // Trilha de fundo via API de streaming do Audius (<audio>, não iframe)
-      "media-src 'self' https://api.audius.co",
+      // Trilha de fundo via API de streaming do Audius (<audio>, não iframe).
+      // O endpoint de stream redireciona (302) para nós de CDN variáveis da
+      // rede descentralizada do Audius (audiusindex.org, figment.io, etc.) —
+      // não dá pra prever/fixar os domínios, por isso libera qualquer https.
+      "media-src 'self' https:",
       "frame-src 'none'",
       "frame-ancestors 'none'",
       "object-src 'none'",

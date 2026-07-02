@@ -26,11 +26,20 @@ export default function AudiusPlayer({ muted }) {
 
     // Navegadores bloqueiam autoplay com som antes do 1º gesto do usuário —
     // se falhar agora, tenta de novo no próximo clique/toque na página.
-    const retry = () => { audio.play().catch(() => {}); };
-    audio.play().catch(() => {
-      document.addEventListener('click', retry, { once: true });
-      document.addEventListener('touchstart', retry, { once: true });
-    });
+    const retry = () => {
+      audio.play().then(
+        () => console.log('[AudiusPlayer] tocando após interação do usuário'),
+        (err) => console.error('[AudiusPlayer] play() falhou mesmo após clique:', err.name, err.message)
+      );
+    };
+    audio.play().then(
+      () => console.log('[AudiusPlayer] autoplay iniciou sem interação'),
+      (err) => {
+        console.warn('[AudiusPlayer] autoplay bloqueado, aguardando 1º clique/toque:', err.name);
+        document.addEventListener('click', retry, { once: true });
+        document.addEventListener('touchstart', retry, { once: true });
+      }
+    );
 
     return () => {
       document.removeEventListener('click', retry);
@@ -38,5 +47,14 @@ export default function AudiusPlayer({ muted }) {
     };
   }, [muted]);
 
-  return <audio ref={audioRef} src={STREAM_URL} loop preload="auto" style={{ display: 'none' }} />;
+  return (
+    <audio
+      ref={audioRef}
+      src={STREAM_URL}
+      loop
+      preload="auto"
+      style={{ display: 'none' }}
+      onError={(e) => console.error('[AudiusPlayer] falha ao carregar a stream:', e.target.error?.message || e.target.error)}
+    />
+  );
 }
