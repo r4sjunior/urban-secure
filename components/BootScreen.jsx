@@ -25,17 +25,18 @@ const ASCII = String.raw`
  ╚══════╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝`;
 
 // Cada linha: { tag, text, delay até a próxima }
+// Mensagens fundem tecnologia e arte de rua — nada de jargão técnico cru.
 const LINES = [
-  { tag: 'sys',  text: 'URBAN_SECURE v1a :: Urban Art NFT Protocol', d: 500 },
-  { tag: 'dim',  text: 'booting on Solana devnet...', d: 700 },
+  { tag: 'sys',  text: 'URBAN SECURE :: onde o muro vira galeria', d: 500 },
+  { tag: 'dim',  text: 'traduzindo spray em memória eterna...', d: 700 },
   { tag: 'sp',   text: '', d: 250 },
-  { tag: 'ok',   text: 'Kernel carregado (urbansec-core v1a)', d: 550 },
-  { tag: 'ok',   text: 'Mounting IPFS filesystem via Pinata', d: 550 },
-  { tag: 'wait', text: 'Initializing Web3 modules...', d: 700 },
-  { tag: 'ok',   text: 'Módulos Web3 prontos', d: 550 },
-  { tag: 'dial', text: 'Discando para o nó RPC', d: 1500 },
-  { tag: 'ok',   text: 'Handshake com a blockchain estabelecido', d: 550 },
-  { tag: 'ok',   text: 'Sincronizando registro de artes urbanas', d: 650 },
+  { tag: 'ok',   text: 'Tinta e pixel, na mesma parede', d: 550 },
+  { tag: 'ok',   text: 'Cada traço vira parte da cidade', d: 550 },
+  { tag: 'wait', text: 'Ouvindo o pulso das ruas...', d: 700 },
+  { tag: 'ok',   text: 'Arte urbana e blockchain, em sintonia', d: 550 },
+  { tag: 'dial', text: 'Localizando artistas por perto', d: 1500 },
+  { tag: 'ok',   text: 'Sinal encontrado nos becos e avenidas', d: 550 },
+  { tag: 'ok',   text: 'Cada obra registrada, para sempre', d: 650 },
   { tag: 'go',   text: 'Bem-vindo, artista. O mundo é sua galeria.', d: 900 },
 ];
 

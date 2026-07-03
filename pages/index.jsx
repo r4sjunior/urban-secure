@@ -6,7 +6,6 @@ import { useArts } from '../context/ArtsContext';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import { resizeImage } from '../lib/resizeImage';
 import { buildRegistryMessage } from '../lib/registrySignature';
-import ArtCarousel from '../components/ArtCarousel';
 import BootScreen from '../components/BootScreen';
 import SoundToggle from '../components/SoundToggle';
 import AudiusPlayer from '../components/AudiusPlayer';
@@ -87,6 +86,7 @@ export default function Home() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [popupOpen, setPopupOpen] = useState(false);
   const [muted, setMuted] = useState(() => (typeof window !== 'undefined' ? sound.isMuted() : true));
 
   const [isMinting, setIsMinting] = useState(false);
@@ -95,25 +95,6 @@ export default function Home() {
   const [mintResult, setMintResult] = useState(null);
 
   const handleLocationUpdate = useCallback(d => setGps(d), []);
-
-  // Mede a altura real do carrossel (0 quando não há artes) e expõe via CSS var
-  // pra elementos flutuantes (.search-float, .map-counter) nunca sobreporem
-  // nem deixarem espaço morto abaixo dele. Usa ref callback porque o carrossel
-  // desmonta (retorna null) quando não há artes — o próprio unmount já zera a altura.
-  const carouselRoRef = useRef(null);
-  const setCarouselRef = useCallback((node) => {
-    if (carouselRoRef.current) { carouselRoRef.current.disconnect(); carouselRoRef.current = null; }
-    if (typeof document === 'undefined') return;
-    if (node && typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(() => {
-        document.documentElement.style.setProperty('--carousel-h', `${node.offsetHeight}px`);
-      });
-      ro.observe(node);
-      carouselRoRef.current = ro;
-    } else {
-      document.documentElement.style.setProperty('--carousel-h', '0px');
-    }
-  }, []);
 
   const artsFiltradas = busca.trim()
     ? arts.filter(a => {
@@ -257,11 +238,8 @@ export default function Home() {
         </header>
 
         {/* Mapa em tela cheia */}
-        <main className="map-stage">
-          <MapView onReady={handleMapReady} onLocationUpdate={handleLocationUpdate} arts={artsFiltradas} isLoading={isLoadingArts} />
-
-          {/* Carrossel de artes registradas (topo) — altura medida via ResizeObserver acima */}
-          <ArtCarousel ref={setCarouselRef} arts={artsFiltradas} onSelect={handleSelectArt} />
+        <main className={`map-stage${popupOpen ? ' popup-open' : ''}`}>
+          <MapView onReady={handleMapReady} onLocationUpdate={handleLocationUpdate} onPopupToggle={setPopupOpen} arts={artsFiltradas} isLoading={isLoadingArts} />
 
           {/* Busca flutuante */}
           <div className="search-float">

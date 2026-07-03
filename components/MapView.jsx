@@ -11,7 +11,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoading = false, onReady }, ref) {
+const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoading = false, onReady, onPopupToggle }, ref) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -27,8 +27,23 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
   const isAuthRef = useRef(isAuthenticated);
+  const onPopupToggleRef = useRef(onPopupToggle);
+  useEffect(() => { onPopupToggleRef.current = onPopupToggle; }, [onPopupToggle]);
 
-  // Centraliza o mapa na arte e abre o popup. Usada pelo carrossel.
+  // Centraliza o popup aberto exatamente no meio da área visível do mapa,
+  // deslocando o mapa (não o popup) — funciona com qualquer tamanho de card.
+  const centerPopupElement = useCallback((popupEl) => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container || !popupEl) return;
+    const mapRect = container.getBoundingClientRect();
+    const popRect = popupEl.getBoundingClientRect();
+    const dx = (popRect.left + popRect.width / 2) - (mapRect.left + mapRect.width / 2);
+    const dy = (popRect.top + popRect.height / 2) - (mapRect.top + mapRect.height / 2);
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) map.panBy([dx, dy], { animate: true, duration: 0.3 });
+  }, []);
+
+  // Centraliza o mapa na arte e abre o popup. Usada pelo feed/leaderboard.
   const focusArt = useCallback((art) => {
     if (!art || !mapRef.current) return;
     const entry = art.id ? markersByIdRef.current.get(art.id) : null;
@@ -163,7 +178,7 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       </div>`;
 
       const marker = L.marker([art.lat, art.lng], { icon })
-        .bindPopup(popup, { maxWidth: 260, className: 'art-popup-wrap' });
+        .bindPopup(popup, { maxWidth: 260, className: 'art-popup-wrap', autoPan: false });
       clusterGroupRef.current.addLayer(marker);
       if (art.id) markersByIdRef.current.set(art.id, { marker, art });
     });
@@ -174,6 +189,9 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     mapRef.current.off('popupclose');
     mapRef.current.on('popupopen', (e) => {
       const el = e.popup?.getElement();
+      onPopupToggleRef.current?.(true);
+      // Espera o popup ser posicionado pelo Leaflet antes de medir e centralizar.
+      setTimeout(() => centerPopupElement(el), 20);
       const img = el?.querySelector('.art-popup-img');
       if (img) {
         img.style.cursor = 'zoom-in';
@@ -203,6 +221,7 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       }
     });
     mapRef.current.on('popupclose', (e) => {
+      onPopupToggleRef.current?.(false);
       const el = e.popup?.getElement();
       const likeContainer = el?.querySelector('.art-popup-like');
       const postId = likeContainer?.getAttribute('data-post-id');
