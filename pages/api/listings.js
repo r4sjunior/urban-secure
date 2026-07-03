@@ -117,7 +117,11 @@ async function handleListings(req, res) {
 
   if (req.method === 'GET') {
     const listings = await getListings(jwt);
-    res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=60');
+    // Sem cache de CDN aqui: quem acabou de anunciar/comprar/cancelar precisa
+    // ver o resultado imediatamente. Com s-maxage a Vercel podia devolver uma
+    // resposta de até ~70s atrás (stale-while-revalidate) logo após a escrita,
+    // fazendo o anúncio recém-criado "sumir" da lista por até esse tempo.
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ listings: Object.values(listings) });
   }
 
