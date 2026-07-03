@@ -20,9 +20,9 @@
  *    cada tier > 1 exige uma nova proposta aceita).
  */
 
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { getRegistryArts } from './registry';
-import { getOffers, saveOffers } from './offers';
+import { getOffers, OFFERS_REGISTRY_NAME } from './offers';
 
 const COLLECTS_REGISTRY_NAME = 'urban-secure-collects-v1';
 const COLLECT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -160,43 +160,72 @@ async function handleCollects(req, res) {
 
       // Lance (tier > 1) exige uma proposta aceita pelo dono da obra pra
       // essa wallet+tier — nunca aceito sem essa aprovação prévia.
-      let offers, matchedOffer;
+      // Checagem rápida (não atômica) só pra falhar cedo antes de gastar
+      // uma chamada RPC — a validação que realmente vale é a atômica logo
+      // abaixo, feita dentro de mutatePin.
+      let offerId;
       if (tier !== 1) {
-        offers = await getOffers(jwt);
+        const offers = await getOffers(jwt);
         const offerList = offers[postId] || [];
-        matchedOffer = offerList.find(o => o.buyerWallet === wallet && o.tier === tier && o.status === 'accepted');
+        const matchedOffer = offerList.find(o => o.buyerWallet === wallet && o.tier === tier && o.status === 'accepted');
         if (!matchedOffer) {
           return res.status(403).json({ error: 'Não há proposta aceita pelo dono da obra pra essa wallet e tier. Proponha um lance e aguarde a aprovação.' });
         }
+        offerId = matchedOffer.id;
       }
 
       const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
-      const collects = await getLatestCollects(jwt);
-      const list = collects[postId] || [];
-
-      const txReused = Object.values(collects).some(arr => arr.some(c => c.tx === tx));
-      if (txReused) {
-        return res.status(409).json({ error: 'Esta transação já foi usada para registrar uma coleta.' });
-      }
 
       const verification = await verifyCollectPayment({ tx, wallet, artistWallet: art.artistWallet, network, tier });
       if (!verification.ok) {
         return res.status(402).json({ error: `Pagamento não confirmado: ${verification.reason}` });
       }
 
-      list.push({ wallet, tx, editionMintId, tier, timestamp: Date.now() });
-      collects[postId] = list;
+      // Consome a proposta aceita ANTES de registrar a coleta — atômico via
+      // mutatePin, então duas requisições concorrentes usando o mesmo aceite
+      // não conseguem registrar duas coletas (a segunda vê a proposta já
+      // 'completed' e é rejeitada, mesmo que ambas tenham lido 'accepted'
+      // no início da função).
+      if (tier !== 1) {
+        const offerMutation = await mutatePin(jwt, OFFERS_REGISTRY_NAME, {}, (raw) => {
+          const offers = (raw && typeof raw === 'object') ? raw : {};
+          const list = offers[postId] || [];
+          const idx = list.findIndex(o => o.id === offerId);
+          if (idx === -1 || list[idx].status !== 'accepted') {
+            throw new MutationAbort({ status: 409, error: 'Esta proposta aceita já foi usada em outra coleta.' });
+          }
+          const updated = { ...list[idx], status: 'completed' };
+          const newList = [...list.slice(0, idx), updated, ...list.slice(idx + 1)];
+          const data = { ...offers, [postId]: newList };
+          return { data, result: updated };
+        });
 
-      const saved = await savePin(jwt, COLLECTS_REGISTRY_NAME, collects);
-      if (!saved) return res.status(502).json({ error: 'Falha ao salvar coleta.' });
-
-      // Consome a proposta usada — cada aceite do dono vale por uma coleta
-      if (matchedOffer) {
-        matchedOffer.status = 'completed';
-        await saveOffers(jwt, offers);
+        if (!offerMutation.ok) {
+          if (offerMutation.aborted) return res.status(offerMutation.payload.status).json({ error: offerMutation.payload.error });
+          return res.status(502).json({ error: 'Falha ao consumir a proposta aceita.' });
+        }
       }
 
-      return res.status(200).json({ ok: true, count: list.length });
+      const collectMutation = await mutatePin(jwt, COLLECTS_REGISTRY_NAME, {}, (raw) => {
+        const collects = (raw && typeof raw === 'object') ? raw : {};
+        const list = collects[postId] || [];
+
+        const txReused = Object.values(collects).some(arr => arr.some(c => c.tx === tx));
+        if (txReused) {
+          throw new MutationAbort({ status: 409, error: 'Esta transação já foi usada para registrar uma coleta.' });
+        }
+
+        const newList = [...list, { wallet, tx, editionMintId, tier, timestamp: Date.now() }];
+        const data = { ...collects, [postId]: newList };
+        return { data, result: { count: newList.length } };
+      });
+
+      if (!collectMutation.ok) {
+        if (collectMutation.aborted) return res.status(collectMutation.payload.status).json({ error: collectMutation.payload.error });
+        return res.status(502).json({ error: 'Falha ao salvar coleta.' });
+      }
+
+      return res.status(200).json({ ok: true, count: collectMutation.result.count });
     } catch (err) {
       console.error('[/api/collects POST]', err.message);
       return res.status(500).json({ error: 'Erro ao registrar coleta.' });

@@ -8,7 +8,7 @@
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 import { buildRegistryMessage } from '../../lib/registrySignature';
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin } from '../../lib/pinataStore';
 import { sanitize } from '../../lib/sanitize';
 
 export const REGISTRY_NAME  = 'urban-secure-registry-v1';
@@ -131,15 +131,17 @@ export default async function handler(req, res) {
         }
       }
 
-      const arts = await getRegistryArts(jwt);
-      if (!arts.find(a => a.id === safeArt.id)) arts.push(safeArt);
+      const mutation = await mutatePin(jwt, REGISTRY_NAME, [], (raw) => {
+        const arts = Array.isArray(raw) ? raw : [];
+        const data = arts.find(a => a.id === safeArt.id) ? arts : [...arts, safeArt];
+        return { data, result: { total: data.length } };
+      });
 
-      const saved = await savePin(jwt, REGISTRY_NAME, arts);
-      if (!saved) {
+      if (!mutation.ok) {
         console.error('[registry POST] falha ao salvar pin');
         return res.status(502).json({ error: 'Falha ao registrar.' });
       }
-      return res.status(200).json({ ok: true, total: arts.length });
+      return res.status(200).json({ ok: true, total: mutation.result.total });
     } catch (err) {
       console.error('[registry POST]', err.message);
       return res.status(500).json({ error: 'Erro ao registrar.' });

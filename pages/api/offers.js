@@ -12,7 +12,7 @@
 
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { getRegistryArts } from './registry';
 import { buildProposeOfferMessage, buildRespondOfferMessage } from '../../lib/offerSignature';
 
@@ -27,10 +27,6 @@ const SIGNATURE_WINDOW_MS = 10 * 60 * 1000;
 export async function getOffers(jwt) {
   const offers = await getLatestPin(jwt, OFFERS_REGISTRY_NAME, {});
   return (offers && typeof offers === 'object') ? offers : {};
-}
-
-export async function saveOffers(jwt, offers) {
-  return savePin(jwt, OFFERS_REGISTRY_NAME, offers);
 }
 
 function computeStatus(offer) {
@@ -103,27 +99,31 @@ async function handleOffers(req, res) {
       return res.status(409).json({ error: 'Lances só ficam disponíveis depois que a coleta padrão de 24h expira.' });
     }
 
-    const offers = await getOffers(jwt);
-    const list = offers[postId] || [];
+    const mutation = await mutatePin(jwt, OFFERS_REGISTRY_NAME, {}, (raw) => {
+      const offers = (raw && typeof raw === 'object') ? raw : {};
+      const list = offers[postId] || [];
 
-    const hasActive = list.some(o => o.buyerWallet === buyerWallet && computeStatus(o) === 'pending');
-    if (hasActive) return res.status(409).json({ error: 'Você já tem uma proposta pendente nesta obra.' });
+      const hasActive = list.some(o => o.buyerWallet === buyerWallet && computeStatus(o) === 'pending');
+      if (hasActive) throw new MutationAbort({ status: 409, error: 'Você já tem uma proposta pendente nesta obra.' });
 
-    const offer = {
-      id: `${buyerWallet}-${timestamp}`,
-      buyerWallet,
-      tier,
-      status: 'pending',
-      createdAt: Date.now(),
-      respondedAt: null,
-    };
-    list.push(offer);
-    offers[postId] = list;
+      const offer = {
+        id: `${buyerWallet}-${timestamp}`,
+        buyerWallet,
+        tier,
+        status: 'pending',
+        createdAt: Date.now(),
+        respondedAt: null,
+      };
+      const data = { ...offers, [postId]: [...list, offer] };
+      return { data, result: offer };
+    });
 
-    const saved = await saveOffers(jwt, offers);
-    if (!saved) return res.status(502).json({ error: 'Falha ao salvar proposta.' });
+    if (!mutation.ok) {
+      if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+      return res.status(502).json({ error: 'Falha ao salvar proposta.' });
+    }
 
-    return res.status(200).json({ ok: true, offer });
+    return res.status(200).json({ ok: true, offer: mutation.result });
   }
 
   if (action === 'respond') {
@@ -147,22 +147,33 @@ async function handleOffers(req, res) {
     if (!art) return res.status(404).json({ error: 'Obra não encontrada no registro.' });
     if (art.artistWallet !== artistWallet) return res.status(403).json({ error: 'Só o dono da obra pode responder propostas dela.' });
 
-    const offers = await getOffers(jwt);
-    const list = offers[postId] || [];
-    const offer = list.find(o => o.id === offerId);
-    if (!offer) return res.status(404).json({ error: 'Proposta não encontrada.' });
-    if (computeStatus(offer) !== 'pending') {
-      return res.status(409).json({ error: 'Esta proposta já não está mais pendente.' });
+    const mutation = await mutatePin(jwt, OFFERS_REGISTRY_NAME, {}, (raw) => {
+      const offers = (raw && typeof raw === 'object') ? raw : {};
+      const list = offers[postId] || [];
+      const idx = list.findIndex(o => o.id === offerId);
+      if (idx === -1) throw new MutationAbort({ status: 404, error: 'Proposta não encontrada.' });
+
+      const offer = list[idx];
+      if (computeStatus(offer) !== 'pending') {
+        throw new MutationAbort({ status: 409, error: 'Esta proposta já não está mais pendente.' });
+      }
+
+      const updatedOffer = {
+        ...offer,
+        status: decision === 'accept' ? 'accepted' : 'rejected',
+        respondedAt: Date.now(),
+      };
+      const newList = [...list.slice(0, idx), updatedOffer, ...list.slice(idx + 1)];
+      const data = { ...offers, [postId]: newList };
+      return { data, result: updatedOffer };
+    });
+
+    if (!mutation.ok) {
+      if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+      return res.status(502).json({ error: 'Falha ao salvar resposta.' });
     }
 
-    offer.status = decision === 'accept' ? 'accepted' : 'rejected';
-    offer.respondedAt = Date.now();
-    offers[postId] = list;
-
-    const saved = await saveOffers(jwt, offers);
-    if (!saved) return res.status(502).json({ error: 'Falha ao salvar resposta.' });
-
-    return res.status(200).json({ ok: true, offer });
+    return res.status(200).json({ ok: true, offer: mutation.result });
   }
 
   return res.status(400).json({ error: 'Ação inválida.' });

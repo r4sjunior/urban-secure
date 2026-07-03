@@ -6,7 +6,7 @@
  * POST { postId, wallet, tx } → registra like (após pagamento confirmado on-chain)
  */
 
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 
 const LIKES_REGISTRY_NAME = 'urban-secure-likes-v1';
 
@@ -18,10 +18,6 @@ const SOLANA_TX_RE   = /^[1-9A-HJ-NP-Za-km-z]{86,90}$/;
 async function getLatestLikes(jwt) {
   const likes = await getLatestPin(jwt, LIKES_REGISTRY_NAME, {});
   return { likes: (likes && typeof likes === 'object') ? likes : {} };
-}
-
-async function saveLikes(jwt, likes) {
-  return savePin(jwt, LIKES_REGISTRY_NAME, likes);
 }
 
 /**
@@ -165,13 +161,29 @@ async function handleLikes(req, res) {
         return res.status(402).json({ error: `Pagamento não confirmado: ${verification.reason}` });
       }
 
-      list.push({ wallet, tx, timestamp: Date.now() });
-      likes[postId] = list;
+      const mutation = await mutatePin(jwt, LIKES_REGISTRY_NAME, {}, (raw) => {
+        const likes = (raw && typeof raw === 'object') ? raw : {};
+        const list = likes[postId] || [];
 
-      const saved = await saveLikes(jwt, likes);
-      if (!saved) return res.status(502).json({ error: 'Falha ao salvar like.' });
+        if (list.some(l => l.wallet === wallet)) {
+          throw new MutationAbort({ status: 409, error: 'Esta wallet já curtiu este post.' });
+        }
+        const txReused = Object.values(likes).some(arr => arr.some(l => l.tx === tx));
+        if (txReused) {
+          throw new MutationAbort({ status: 409, error: 'Esta transação já foi usada para registrar um like.' });
+        }
 
-      return res.status(200).json({ ok: true, count: list.length });
+        const newList = [...list, { wallet, tx, timestamp: Date.now() }];
+        const data = { ...likes, [postId]: newList };
+        return { data, result: { count: newList.length } };
+      });
+
+      if (!mutation.ok) {
+        if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+        return res.status(502).json({ error: 'Falha ao salvar like.' });
+      }
+
+      return res.status(200).json({ ok: true, count: mutation.result.count });
     } catch (err) {
       console.error('[/api/likes POST]', err.message);
       return res.status(500).json({ error: 'Erro ao registrar like.' });

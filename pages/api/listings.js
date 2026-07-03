@@ -14,7 +14,7 @@
 
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { verifyVaultHoldsMint, transferFromVault } from '../../lib/vaultSigner';
 import { buildDelistMessage } from '../../lib/listingSignature';
 import { sanitize } from '../../lib/sanitize';
@@ -146,18 +146,22 @@ async function handleListings(req, res) {
       return res.status(402).json({ error: 'O NFT ainda não chegou na vault. Aguarde a confirmação da transferência e tente novamente.' });
     }
 
-    const listings = await getListings(jwt);
-    listings[mint] = {
-      mint,
-      seller,
-      price: priceNum,
-      name: sanitize(name, 200),
-      imageUrl: (typeof imageUrl === 'string' && imageUrl.startsWith('https://gateway.pinata.cloud/ipfs/')) ? imageUrl : '',
-      listedAt: Date.now(),
-    };
-
-    const saved = await savePin(jwt, LISTINGS_REGISTRY_NAME, listings);
-    if (!saved) return res.status(502).json({ error: 'Falha ao salvar anúncio.' });
+    const mutation = await mutatePin(jwt, LISTINGS_REGISTRY_NAME, {}, (raw) => {
+      const listings = (raw && typeof raw === 'object') ? raw : {};
+      const data = {
+        ...listings,
+        [mint]: {
+          mint,
+          seller,
+          price: priceNum,
+          name: sanitize(name, 200),
+          imageUrl: (typeof imageUrl === 'string' && imageUrl.startsWith('https://gateway.pinata.cloud/ipfs/')) ? imageUrl : '',
+          listedAt: Date.now(),
+        },
+      };
+      return { data, result: true };
+    });
+    if (!mutation.ok) return res.status(502).json({ error: 'Falha ao salvar anúncio.' });
     return res.status(200).json({ ok: true });
   }
 
@@ -167,18 +171,35 @@ async function handleListings(req, res) {
     if (!SOLANA_ADDR_RE.test(buyer)) return res.status(400).json({ error: 'buyer inválido.' });
     if (!SOLANA_TX_RE.test(tx))      return res.status(400).json({ error: 'Assinatura de transação inválida.' });
 
-    const listings = await getListings(jwt);
-    const listing = listings[mint];
-    if (!listing) return res.status(404).json({ error: 'Anúncio não encontrado — pode já ter sido vendido ou cancelado.' });
-    if (listing.seller === buyer) return res.status(403).json({ error: 'Você não pode comprar seu próprio anúncio.' });
+    // Checagem rápida (não atômica) só pra falhar cedo antes de gastar uma
+    // chamada RPC — a checagem que vale de verdade é a atômica dentro do
+    // mutatePin, feita depois do pagamento verificado.
+    const preListings = await getListings(jwt);
+    const preListing = preListings[mint];
+    if (!preListing) return res.status(404).json({ error: 'Anúncio não encontrado — pode já ter sido vendido ou cancelado.' });
+    if (preListing.seller === buyer) return res.status(403).json({ error: 'Você não pode comprar seu próprio anúncio.' });
 
-    const priceLamports = Math.round(listing.price * 1e9);
-    const verification = await verifyBuyPayment({ tx, buyer, seller: listing.seller, priceLamports });
+    const priceLamports = Math.round(preListing.price * 1e9);
+    const verification = await verifyBuyPayment({ tx, buyer, seller: preListing.seller, priceLamports });
     if (!verification.ok) return res.status(402).json({ error: `Pagamento não confirmado: ${verification.reason}` });
 
-    delete listings[mint];
-    const saved = await savePin(jwt, LISTINGS_REGISTRY_NAME, listings);
-    if (!saved) return res.status(502).json({ error: 'Falha ao atualizar anúncios.' });
+    // Remove o anúncio de forma atômica — se ele já não existir mais (outro
+    // comprador levou primeiro, ou o vendedor cancelou, enquanto verificávamos
+    // o pagamento acima), aborta antes de tentar mover o NFT da vault.
+    const mutation = await mutatePin(jwt, LISTINGS_REGISTRY_NAME, {}, (raw) => {
+      const listings = (raw && typeof raw === 'object') ? raw : {};
+      const listing = listings[mint];
+      if (!listing) {
+        throw new MutationAbort({ status: 409, error: 'Este anúncio já foi vendido ou cancelado. Seu pagamento foi enviado ao vendedor antigo — contate o suporte para verificação/estorno.' });
+      }
+      const { [mint]: _removed, ...rest } = listings;
+      return { data: rest, result: true };
+    });
+
+    if (!mutation.ok) {
+      if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+      return res.status(502).json({ error: 'Falha ao atualizar anúncios.' });
+    }
 
     try {
       await transferFromVault({ mint, toWallet: buyer });
@@ -198,18 +219,23 @@ async function handleListings(req, res) {
       return res.status(400).json({ error: 'Timestamp inválido ou expirado. Tente novamente.' });
     }
     if (typeof signature !== 'string' || !signature) return res.status(401).json({ error: 'Assinatura ausente.' });
-
-    const listings = await getListings(jwt);
-    const listing = listings[mint];
-    if (!listing) return res.status(404).json({ error: 'Anúncio não encontrado.' });
-    if (listing.seller !== seller) return res.status(403).json({ error: 'Esta wallet não é a vendedora deste anúncio.' });
     if (!verifySellerSignature({ mint, seller, timestamp, signature })) {
       return res.status(401).json({ error: 'Assinatura inválida — a carteira não confirmou este cancelamento.' });
     }
 
-    delete listings[mint];
-    const saved = await savePin(jwt, LISTINGS_REGISTRY_NAME, listings);
-    if (!saved) return res.status(502).json({ error: 'Falha ao atualizar anúncios.' });
+    const mutation = await mutatePin(jwt, LISTINGS_REGISTRY_NAME, {}, (raw) => {
+      const listings = (raw && typeof raw === 'object') ? raw : {};
+      const listing = listings[mint];
+      if (!listing) throw new MutationAbort({ status: 404, error: 'Anúncio não encontrado.' });
+      if (listing.seller !== seller) throw new MutationAbort({ status: 403, error: 'Esta wallet não é a vendedora deste anúncio.' });
+      const { [mint]: _removed, ...rest } = listings;
+      return { data: rest, result: true };
+    });
+
+    if (!mutation.ok) {
+      if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+      return res.status(502).json({ error: 'Falha ao atualizar anúncios.' });
+    }
 
     try {
       await transferFromVault({ mint, toWallet: seller });

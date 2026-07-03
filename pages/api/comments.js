@@ -8,7 +8,7 @@
 
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
-import { getLatestPin, savePin } from '../../lib/pinataStore';
+import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { sanitize } from '../../lib/sanitize';
 import { buildCommentMessage } from '../../lib/commentSignature';
 
@@ -75,21 +75,26 @@ export default async function handler(req, res) {
         return res.status(401).json({ error: 'Assinatura inválida — a carteira não confirmou este comentário.' });
       }
 
-      const comments = await getLatestComments(jwt);
-      const list = comments[postId] || [];
+      const mutation = await mutatePin(jwt, COMMENTS_REGISTRY_NAME, {}, (raw) => {
+        const comments = (raw && typeof raw === 'object') ? raw : {};
+        const list = comments[postId] || [];
 
-      const last = [...list].reverse().find(c => c.wallet === wallet);
-      if (last && Date.now() - last.timestamp < MIN_INTERVAL_MS) {
-        return res.status(429).json({ error: 'Aguarde alguns segundos antes de comentar de novo.' });
+        const last = [...list].reverse().find(c => c.wallet === wallet);
+        if (last && Date.now() - last.timestamp < MIN_INTERVAL_MS) {
+          throw new MutationAbort({ status: 429, error: 'Aguarde alguns segundos antes de comentar de novo.' });
+        }
+
+        const newList = [...list, { wallet, text: safeText, timestamp: Date.now() }];
+        const data = { ...comments, [postId]: newList };
+        return { data, result: { count: newList.length } };
+      });
+
+      if (!mutation.ok) {
+        if (mutation.aborted) return res.status(mutation.payload.status).json({ error: mutation.payload.error });
+        return res.status(502).json({ error: 'Falha ao salvar comentário.' });
       }
 
-      list.push({ wallet, text: safeText, timestamp: Date.now() });
-      comments[postId] = list;
-
-      const saved = await savePin(jwt, COMMENTS_REGISTRY_NAME, comments);
-      if (!saved) return res.status(502).json({ error: 'Falha ao salvar comentário.' });
-
-      return res.status(200).json({ ok: true, count: list.length });
+      return res.status(200).json({ ok: true, count: mutation.result.count });
     } catch (err) {
       console.error('[/api/comments POST]', err.message);
       return res.status(500).json({ error: 'Erro ao comentar.' });
