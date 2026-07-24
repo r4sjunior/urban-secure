@@ -25,6 +25,7 @@ import bs58 from 'bs58';
 import { getLatestPin, getLatestPinStrict, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { CLAIMS, REGISTRY, FAUCET_LEDGER } from '../../lib/collections';
 import { rateLimit, clientIp } from '../../lib/rateLimit';
+import { guardServerConfig } from '../../lib/serverConfig';
 import { buildClaimMessage, claimDay } from '../../lib/social/claimSignature';
 import { evaluateClaim, emptyClaimState, applyClaim, reserveClaim } from '../../lib/social/claim';
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
@@ -107,6 +108,12 @@ export default async function handler(req, res) {
 
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
+
+  // Confere a configuração ANTES de tentar qualquer coisa. Sem isto, uma
+  // credencial ausente vira um 500 genérico lá na frente, com a mensagem
+  // "tente de novo" — que manda o usuário repetir uma ação que não tem como
+  // dar certo. O POST exige também a treasury, que é quem paga.
+  if (guardServerConfig(res, { precisaTreasury: req.method === 'POST' })) return;
 
   // ── GET: consulta ────────────────────────────────────────────────────────
   if (req.method === 'GET') {
@@ -345,7 +352,16 @@ export default async function handler(req, res) {
       if (ledgerReserved) await rollbackLedger(jwt, day, reservedLamports);
     }
 
-    return res.status(500).json({ error: 'Não foi possível concluir o resgate. Tente de novo.' });
+    // Falha de leitura/escrita no armazenamento não é culpa do usuário e
+    // não melhora com insistência — dizer "tente de novo" seria empurrá-lo
+    // para um laço. A mensagem separa o que ele pode fazer do que não pode.
+    const ehArmazenamento = /Leitura de|save-failed|pinata|401|403/i.test(err.message || '');
+
+    return res.status(ehArmazenamento ? 503 : 500).json({
+      error: ehArmazenamento
+        ? 'O serviço de dados do app está indisponível agora. Seu streak está seguro — tente daqui a pouco.'
+        : 'Não foi possível concluir o resgate. Tente de novo.',
+    });
   }
 }
 

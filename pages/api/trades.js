@@ -22,6 +22,7 @@
  */
 
 import nacl from 'tweetnacl';
+import { guardServerConfig } from '../../lib/serverConfig';
 import bs58 from 'bs58';
 import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
 import { TRADES, STICKERS, CLAIMS } from '../../lib/collections';
@@ -67,6 +68,10 @@ export default async function handler(req, res) {
 
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
+
+  // Diagnóstico antes de qualquer I/O: credencial faltando produz uma
+  // mensagem acionável, não um erro genérico que pede para tentar de novo.
+  if (guardServerConfig(res)) return;
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {

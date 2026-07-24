@@ -62,15 +62,27 @@ export function ClaimProvider({ children }) {
       const json = await res.json();
       if (requestedFor.current !== target) return;
 
-      if (!res.ok) throw new Error(json.error || 'Erro ao consultar o claim.');
+      if (!res.ok) {
+        // Configuração incompleta no servidor não é falha transitória: o
+        // botão vai ficar indisponível para sempre, e esconder o motivo faz
+        // o usuário achar que o app está quebrado sem saber o que houve.
+        // Este é o único erro de LEITURA que merece aparecer na tela.
+        if (json.configIncompleta) {
+          setStatus(EMPTY_STATUS);
+          setError(json.error);
+          return;
+        }
+        throw new Error(json.error || 'Erro ao consultar o claim.');
+      }
+
       setStatus(json.status || EMPTY_STATUS);
       setError(null);
     } catch (err) {
       if (requestedFor.current !== target) return;
       console.error('[ClaimContext] load:', err.message);
-      // Não mostra erro na UI: falhar a consulta só significa que o botão
-      // fica indisponível, e um alerta vermelho permanente por uma leitura
-      // que falhou seria ruído.
+      // Falha transitória de leitura segue silenciosa: o botão fica
+      // indisponível e tentar de novo resolve, então um alerta vermelho
+      // permanente seria ruído.
       setStatus(EMPTY_STATUS);
     } finally {
       if (requestedFor.current === target) setIsLoading(false);

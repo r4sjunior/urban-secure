@@ -549,6 +549,12 @@ a.icon-btn, a.feed-toggle { text-decoration: none; }
    flutua sobre o mapa (busca, contador, GPS) pra nada sobrepor o card ── */
 .map-stage.popup-open .search-float,
 .map-stage.popup-open .map-counter,
+.map-stage.popup-open .gps-fab,
+.map-stage.popup-open .leaflet-control-zoom {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast);
+}
 
 .lightbox{position:fixed;inset:0;z-index:3000;background:rgba(5,6,8,.94);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .2s}
 .lightbox img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:var(--r-md);box-shadow:var(--shadow)}
