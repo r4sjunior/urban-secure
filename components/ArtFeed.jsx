@@ -1,13 +1,23 @@
 /**
  * components/ArtFeed.jsx
  * Feed estilo Instagram com as últimas artes registradas.
- * Cada card: avatar/artista, imagem, like (pago) e botão de localização
- * que fecha o feed e centraliza o mapa na obra.
+ * Cada card: artista (com link pro perfil), mídia, like/coleta, "como chegar"
+ * e botão de localização que fecha o feed e centraliza o mapa na obra.
  */
+import Link from 'next/link';
 import LikeButton from './LikeButton';
 import CollectButton from './CollectButton';
 import CommentsSection from './CommentsSection';
+import FeedAvatar from './feed/FeedAvatar';
 import { timeAgo } from '../lib/timeAgo';
+import { googleMapsUrl } from '../lib/googleMaps';
+
+/** Vídeo e imagem chegam no mesmo campo `imageUrl`. Sem carregar o metadata
+ *  de cada obra, a extensão preservada pelo gateway do IPFS é o sinal
+ *  disponível — barato e suficiente pra escolher <video> ou <img>. */
+function isVideoUrl(url) {
+  return /\.(webm|mp4)(\?|$)/i.test(url || '');
+}
 
 export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenticated = false }) {
   if (!open) return null;
@@ -29,16 +39,26 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
           )}
 
           {sorted.map(art => {
-            const img = (art.imageUrl || '').startsWith('https://') ? art.imageUrl : '';
-            const initial = (art.artistName || art.name || '?').trim().charAt(0).toUpperCase() || '?';
+            const media = (art.imageUrl || '').startsWith('https://') ? art.imageUrl : '';
+            const mapsUrl = googleMapsUrl(art.lat, art.lng);
+            const perfilUrl = art.artistWallet ? `/perfil/${encodeURIComponent(art.artistWallet)}` : null;
+
             return (
               <article className="feed-card" key={art.id}>
                 <div className="feed-card-head">
-                  <div className="feed-avatar"><span>{initial}</span></div>
+                  <FeedAvatar wallet={art.artistWallet} fallbackName={art.artistName || art.name} />
+
                   <div className="feed-card-headinfo">
-                    <span className="feed-artist">{art.artistName || 'Anônimo'}</span>
+                    {perfilUrl ? (
+                      <Link href={perfilUrl} className="feed-artist feed-artist-link" onClick={onClose}>
+                        {art.artistName || 'Anônimo'}
+                      </Link>
+                    ) : (
+                      <span className="feed-artist">{art.artistName || 'Anônimo'}</span>
+                    )}
                     <span className="feed-time">{timeAgo(art.timestamp)}</span>
                   </div>
+
                   <button
                     className="feed-locate"
                     onClick={() => onLocate && onLocate(art)}
@@ -50,9 +70,16 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
                 </div>
 
                 <div className="feed-media">
-                  {img
-                    ? <img src={img} alt={art.name || 'Arte'} loading="lazy" />
-                    : <div className="feed-media-ph">🎨</div>}
+                  {!media ? (
+                    <div className="feed-media-ph">🎨</div>
+                  ) : isVideoUrl(media) ? (
+                    // Sem autoplay de propósito: um feed que dispara vários
+                    // vídeos de uma vez queima o dado móvel do usuário e
+                    // trava em celular fraco.
+                    <video src={media} controls playsInline preload="metadata" />
+                  ) : (
+                    <img src={media} alt={art.name || 'Arte'} loading="lazy" />
+                  )}
                 </div>
 
                 <div className="feed-card-body">
@@ -60,9 +87,17 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
                     <LikeButton postId={art.id} artistWallet={art.artistWallet} isAuthenticated={isAuthenticated} />
                     <CollectButton art={art} isAuthenticated={isAuthenticated} />
                   </div>
+
                   <p className="feed-desc">
                     <strong>{art.name}</strong> {art.description}
                   </p>
+
+                  {mapsUrl && (
+                    <a className="feed-maps" href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                      🧭 Como chegar até a obra
+                    </a>
+                  )}
+
                   <CommentsSection postId={art.id} isAuthenticated={isAuthenticated} />
                 </div>
               </article>

@@ -6,6 +6,8 @@
  * Faz merge dos dois e remove duplicatas.
  */
 
+import { isUrbanAsset, normalizeDasAsset } from '../../lib/solana/standard';
+
 const REGISTRY_NAME = 'urban-secure-registry-v1';
 
 async function getRegistry(jwt) {
@@ -24,39 +26,47 @@ async function getRegistry(jwt) {
   } catch { return []; }
 }
 
+/**
+ * Busca no DAS os dois padrões de asset do app.
+ *
+ * `tokenType: 'nonFungible'` cobre o acervo Token Metadata, mas NÃO retorna
+ * assets Metaplex Core — o DAS os classifica como interface "MplCoreAsset" e
+ * eles ficam de fora desse filtro. Depois da migração (ver ARCHITECTURE.md),
+ * consultar só uma das duas formas deixaria metade do mapa invisível: as
+ * artes novas ou as antigas, dependendo do filtro escolhido.
+ */
 async function getHelius(apiKey, network) {
   const cluster = network === 'mainnet-beta' ? 'mainnet' : 'devnet';
   const url = `https://${cluster}.helius-rpc.com/?api-key=${apiKey}`;
-  let page = 1, assets = [];
-  try {
-    while (page <= 10) {
-      const r = await fetch(url, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc:'2.0', id:'u', method:'searchAssets', params:{ tokenType:'nonFungible', page, limit:1000 } }),
-      });
-      if (!r.ok) break;
-      const data = await r.json();
-      const items = data?.result?.items ?? [];
-      assets = [...assets, ...items];
-      if (items.length < 1000) break;
-      page++;
-    }
-  } catch {}
-  return assets
-    .filter(a => (a?.content?.metadata?.symbol ?? '').trim() === 'URBAN')
-    .map(asset => {
-      const attrs = asset?.content?.metadata?.attributes ?? [];
-      const lat = parseFloat(attrs.find(x=>x.trait_type==='Latitude')?.value);
-      const lng = parseFloat(attrs.find(x=>x.trait_type==='Longitude')?.value);
-      if (isNaN(lat)||isNaN(lng)) return null;
-      const artistName = attrs.find(x=>x.trait_type==='Artista')?.value || (asset?.content?.metadata?.name??'').replace('Urban Art — ','');
-      return {
-        id: asset.id, name: asset?.content?.metadata?.name ?? 'Urban Art', artistName,
-        description: asset?.content?.metadata?.description ?? '',
-        lat, lng, imageUrl: asset?.content?.links?.image ?? '',
-        artistWallet: asset?.ownership?.owner ?? '', timestamp: Date.now(),
-      };
-    })
+
+  async function search(params) {
+    let page = 1, assets = [];
+    try {
+      while (page <= 10) {
+        const r = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 'u', method: 'searchAssets', params: { ...params, page, limit: 1000 } }),
+        });
+        if (!r.ok) break;
+        const data = await r.json();
+        const items = data?.result?.items ?? [];
+        assets = [...assets, ...items];
+        if (items.length < 1000) break;
+        page++;
+      }
+    } catch {}
+    return assets;
+  }
+
+  // As duas buscas em paralelo — são independentes e cada uma pode paginar.
+  const [legacy, core] = await Promise.all([
+    search({ tokenType: 'nonFungible' }),
+    search({ interface: 'MplCoreAsset' }),
+  ]);
+
+  return [...legacy, ...core]
+    .filter(isUrbanAsset)
+    .map(normalizeDasAsset)
     .filter(Boolean);
 }
 

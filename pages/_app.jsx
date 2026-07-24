@@ -5,6 +5,8 @@ import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { clusterApiUrl } from '@solana/web3.js';
 import { ArtsProvider } from '../context/ArtsContext';
 import { WalletAuthProvider } from '../context/WalletAuthContext';
+import { ProfileProvider } from '../context/ProfileContext';
+import { ClaimProvider } from '../context/ClaimContext';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 import '../styles/globals.css';
@@ -24,7 +26,18 @@ function Providers({ children }) {
       >
         <WalletModalProvider>
           <WalletAuthProvider>
-            <ArtsProvider>{children}</ArtsProvider>
+            {/* ProfileProvider por fora do ArtsProvider: o perfil depende só
+                da carteira conectada, enquanto o mapa de artes é pesado e
+                recarrega sozinho. Invertida, toda atualização do registry
+                arrastaria o perfil junto. */}
+            <ProfileProvider>
+              {/* ClaimProvider dentro do ProfileProvider: o sheet do claim
+                  dispara refresh do perfil ao resgatar (streak e ranking
+                  mudam), então precisa enxergar aquele contexto. */}
+              <ClaimProvider>
+                <ArtsProvider>{children}</ArtsProvider>
+              </ClaimProvider>
+            </ProfileProvider>
           </WalletAuthProvider>
         </WalletModalProvider>
       </WalletProvider>

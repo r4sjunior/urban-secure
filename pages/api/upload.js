@@ -8,10 +8,16 @@ export const config = {
   api: { bodyParser: { sizeLimit: '12mb' } },
 };
 
-const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_MIMES = new Set([
+  'image/jpeg', 'image/png', 'image/webp',
+  // Vídeo curto sem áudio (components/capture/CameraCapture.jsx). O webm sai
+  // do MediaRecorder no Chrome/Firefox; o mp4, no Safari.
+  'video/webm', 'video/mp4',
+]);
 
-// Detecta o tipo real da imagem pelos magic bytes (ignora MIME declarado pelo cliente)
-function detectImageType(buffer) {
+// Detecta o tipo real pelos magic bytes, ignorando o MIME declarado pelo
+// cliente — que é só uma string no JSON e pode dizer qualquer coisa.
+function detectMediaType(buffer) {
   if (buffer.length < 12) return null;
   // JPEG: FF D8 FF
   if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) return 'image/jpeg';
@@ -20,6 +26,10 @@ function detectImageType(buffer) {
   // WebP: RIFF....WEBP
   if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
       buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) return 'image/webp';
+  // WebM / Matroska: 1A 45 DF A3 (assinatura EBML)
+  if (buffer[0] === 0x1A && buffer[1] === 0x45 && buffer[2] === 0xDF && buffer[3] === 0xA3) return 'video/webm';
+  // MP4: bytes 4..8 == "ftyp"
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) return 'video/mp4';
   return null;
 }
 
@@ -53,24 +63,26 @@ export default async function handler(req, res) {
   try {
     const { type, data, filename, mime } = req.body || {};
 
-    if (type === 'image') {
-      if (!data) return res.status(400).json({ error: 'Imagem ausente.' });
+    // 'image' cobre foto e vídeo — o nome do tipo ficou por compatibilidade
+    // com os clientes já publicados; o que manda é o magic byte detectado.
+    if (type === 'image' || type === 'media') {
+      if (!data) return res.status(400).json({ error: 'Arquivo ausente.' });
 
       const base64 = data.includes(',') ? data.split(',')[1] : data;
       let buffer;
       try {
         buffer = Buffer.from(base64, 'base64');
       } catch {
-        return res.status(400).json({ error: 'Dados de imagem inválidos.' });
+        return res.status(400).json({ error: 'Dados de arquivo inválidos.' });
       }
 
-      // Verifica magic bytes — rejeita qualquer coisa que não seja imagem real
-      const detectedMime = detectImageType(buffer);
+      // Verifica magic bytes — rejeita qualquer coisa que não seja mídia real
+      const detectedMime = detectMediaType(buffer);
       if (!detectedMime) {
-        return res.status(400).json({ error: 'Arquivo não reconhecido como imagem válida.' });
+        return res.status(400).json({ error: 'Arquivo não reconhecido como imagem ou vídeo válido.' });
       }
       if (!ALLOWED_MIMES.has(detectedMime)) {
-        return res.status(400).json({ error: 'Tipo de imagem não suportado. Use JPEG, PNG ou WebP.' });
+        return res.status(400).json({ error: 'Tipo não suportado. Use JPEG, PNG, WebP, WebM ou MP4.' });
       }
 
       const safeFilename = sanitizeFilename(filename);
@@ -86,10 +98,12 @@ export default async function handler(req, res) {
       if (!r.ok) {
         const detail = await r.text();
         console.error('[/api/upload] file', r.status, detail.slice(0, 200));
-        return res.status(502).json({ error: 'Falha no upload da imagem.' });
+        return res.status(502).json({ error: 'Falha no upload do arquivo.' });
       }
       const { IpfsHash } = await r.json();
-      return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}` });
+      // Devolve o mime detectado: quem chamou precisa dele pra montar o
+      // `properties.category` do metadata Metaplex (image vs video).
+      return res.status(200).json({ url: `https://gateway.pinata.cloud/ipfs/${IpfsHash}`, mime: detectedMime });
     }
 
     if (type === 'json') {

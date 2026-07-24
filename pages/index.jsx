@@ -1,9 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
 import { useWalletAuth } from '../context/WalletAuthContext';
+import { useMyProfile } from '../context/ProfileContext';
+import { useClaim } from '../context/ClaimContext';
+import Avatar from '../components/profile/Avatar';
 import { resizeImage } from '../lib/resizeImage';
 import { buildRegistryMessage } from '../lib/registrySignature';
 import BootScreen from '../components/BootScreen';
@@ -19,6 +23,9 @@ const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: 
 const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
 const TransferModal= dynamic(() => import('../components/TransferModal'),{ ssr: false });
 const MarketModal  = dynamic(() => import('../components/MarketModal'),  { ssr: false });
+const ProfileSheet = dynamic(() => import('../components/profile/ProfileSheet'), { ssr: false });
+const ClaimSheet   = dynamic(() => import('../components/claim/ClaimSheet'),     { ssr: false });
+const CameraCapture= dynamic(() => import('../components/capture/CameraCapture'),{ ssr: false });
 
 const STEPS = [
   { key: 'upload-image', label: 'Enviando imagem',   icon: '🖼️' },
@@ -27,9 +34,14 @@ const STEPS = [
 ];
 
 // ── Metadados Metaplex ──
-function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, artistWallet, network }) {
+function buildMetadata({ name, description, imageUri, mime, capturedAt, lat, lng, acc, fonte, artistWallet, network }) {
+  const isVideo = (mime || '').startsWith('video/');
+
   return {
     name, symbol: 'URBAN', description, image: imageUri,
+    // Carteiras e exploradores procuram `animation_url` pra reproduzir vídeo;
+    // `image` sozinho seria renderizado como imagem estática quebrada.
+    ...(isVideo ? { animation_url: imageUri } : {}),
     seller_fee_basis_points: 500,
     attributes: [
       { trait_type: 'Artista',   value: name.replace('Urban Art — ', '') },
@@ -39,10 +51,15 @@ function buildMetadata({ name, description, imageUri, lat, lng, acc, fonte, arti
       { trait_type: 'Fonte GPS', value: fonte || 'GPS' },
       { trait_type: 'Rede',      value: network || 'devnet' },
       { trait_type: 'Categoria', value: 'Arte Urbana' },
+      { trait_type: 'Mídia',     value: isVideo ? 'Vídeo' : 'Foto' },
+      // Instante em que o obturador foi acionado. Fica no registro público
+      // como parte da prova de captura ao vivo — comparável com o timestamp
+      // assinado no registro.
+      { trait_type: 'Capturado em', value: new Date(capturedAt || Date.now()).toISOString() },
     ],
     properties: {
-      category: 'image',
-      files: [{ uri: imageUri, type: 'image/jpeg' }],
+      category: isVideo ? 'video' : 'image',
+      files: [{ uri: imageUri, type: mime || 'image/jpeg' }],
       creators: [{ address: artistWallet, share: 100 }],
     },
   };
@@ -52,6 +69,8 @@ export default function Home() {
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
   const { arts, isLoading: isLoadingArts, addArt } = useArts();
+  const { profile, hasProfile } = useMyProfile();
+  const { status: claimStatus } = useClaim();
 
   const mapRef = useRef(null);
   // Recebe a API do mapa via callback (funciona mesmo com next/dynamic)
@@ -76,8 +95,11 @@ export default function Home() {
 
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
+  // Mídia capturada pela câmera: { file, previewUrl, capturedAt, kind }.
+  // Não existe caminho pra popular isto a partir de um arquivo escolhido —
+  // ver lib/capture/useCamera.js.
+  const [media, setMedia] = useState(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [gps, setGps] = useState(null);
   const [busca, setBusca] = useState('');
   const [booting, setBooting] = useState(true);
@@ -86,6 +108,8 @@ export default function Home() {
   const [marketOpen, setMarketOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const [muted, setMuted] = useState(() => (typeof window !== 'undefined' ? sound.isMuted() : true));
 
@@ -105,17 +129,20 @@ export default function Home() {
       })
     : arts;
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImageFile(file);
-    const r = new FileReader();
-    r.onload = () => setImagePreview(r.result);
-    r.readAsDataURL(file);
-  };
+  const handleCapture = useCallback((captured) => {
+    // Libera o preview anterior — cada captura cria um object URL, e refazer
+    // a foto várias vezes vazaria um blob por tentativa.
+    setMedia(prev => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return captured;
+    });
+    setCameraOpen(false);
+    setMintError(null);
+  }, []);
 
   function resetForm() {
-    setNome(''); setDescricao(''); setImageFile(null); setImagePreview('');
+    setNome(''); setDescricao('');
+    setMedia(prev => { if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl); return null; });
     setMintStep(null); setMintError(null); setMintResult(null);
   }
   function handleOverlayDismiss() {
@@ -129,7 +156,7 @@ export default function Home() {
     const gpsOk = gps && !gps.error && gps.lat && gps.lng;
     if (!gpsOk) return setMintError('Aguardando GPS. Vá para área aberta.');
     if (!nome.trim() || !descricao.trim()) return setMintError('Preencha nome e descrição.');
-    if (!imageFile) return setMintError('Selecione ou fotografe a obra.');
+    if (!media?.file) return setMintError('Fotografe ou grave a obra pela câmera.');
 
     const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
     const artistWallet = wallet.publicKey.toBase58();
@@ -140,11 +167,20 @@ export default function Home() {
 
     try {
       setMintStep('upload-image');
-      const resized = await resizeImage(imageFile, 800, 0.85);
-      const imageUri = await uploadFile(resized);
+      // Vídeo já sai do MediaRecorder com bitrate limitado; passar por
+      // resizeImage (que é canvas de imagem) o corromperia.
+      const toUpload = media.kind === 'video'
+        ? media.file
+        : await resizeImage(media.file, 1200, 0.85);
+      const { url: imageUri, mime } = await uploadFile(toUpload);
 
       setMintStep('upload-meta');
-      const metadata = buildMetadata({ name: nftName, description: descricao, imageUri, lat: gps.lat, lng: gps.lng, acc: gps.acc, fonte: gps.fonte, artistWallet, network });
+      const metadata = buildMetadata({
+        name: nftName, description: descricao, imageUri, mime,
+        capturedAt: media.capturedAt,
+        lat: gps.lat, lng: gps.lng, acc: gps.acc, fonte: gps.fonte,
+        artistWallet, network,
+      });
       const metadataUri = await uploadJson(metadata);
 
       setMintStep('minting');
@@ -226,12 +262,47 @@ export default function Home() {
             <button className="feed-toggle" onClick={() => { sound.play('click'); setFeedOpen(true); }} title="Feed" aria-label="Feed">
               🗞️
             </button>
-            <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Leaderboard" aria-label="Leaderboard">
+            {/* Dois rankings distintos, e ambos importam: o 🏆 mede ARTISTAS
+                pela produção da semana (e paga SOL), o ❤️ mede OBRAS pelas
+                curtidas acumuladas. Fundir os dois apagaria uma das duas
+                leituras. */}
+            <Link href="/ranking" className="feed-toggle" title="Ranking semanal" aria-label="Ranking semanal">
               🏆
+            </Link>
+            <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Mais curtidas" aria-label="Mais curtidas">
+              ❤️
             </button>
             <button className="feed-toggle" onClick={() => { sound.play('click'); setMarketOpen(true); }} title="Mercado" aria-label="Mercado">
               🛒
             </button>
+            <Link href="/album" className="feed-toggle" title="Álbum de figurinhas" aria-label="Álbum">
+              🃏
+            </Link>
+            {wallet.connected && (
+              <button
+                className={`streak-chip${claimStatus.canClaim ? ' ready' : ''}${claimStatus.streakAtRisk ? ' risk' : ''}`}
+                onClick={() => { sound.play('click'); setClaimOpen(true); }}
+                title={claimStatus.canClaim ? 'Resgate disponível' : 'Claim diário'}
+                aria-label="Claim diário"
+              >
+                <span className="streak-chip-icon">🔥</span>
+                <span className="streak-chip-n">{claimStatus.currentStreak}</span>
+              </button>
+            )}
+            {wallet.connected && (
+              <button
+                className="profile-toggle"
+                onClick={() => { sound.play('click'); setProfileOpen(true); }}
+                title="Meu perfil"
+                aria-label="Meu perfil"
+              >
+                <Avatar profile={profile} wallet={wallet.publicKey?.toBase58()} size={28} />
+                {/* Ponto de atenção em quem ainda não preencheu o perfil — a
+                    figurinha credita o artista pelo nome, então perfil vazio
+                    é um custo real pro usuário, não só um campo em branco. */}
+                {!hasProfile && <span className="profile-toggle-dot" />}
+              </button>
+            )}
             <AudiusPlayer muted={muted} />
             <SoundToggle muted={muted} onToggle={handleToggleSound} />
           </div>
@@ -260,6 +331,19 @@ export default function Home() {
           </button>
         </nav>
 
+        {/* Câmera ao vivo — único caminho de entrada de mídia do registro */}
+        <CameraCapture
+          open={cameraOpen}
+          onCapture={handleCapture}
+          onClose={() => setCameraOpen(false)}
+        />
+
+        {/* Claim diário — streak, resgate e regras */}
+        <ClaimSheet open={claimOpen} onClose={() => setClaimOpen(false)} />
+
+        {/* Perfil próprio — stats, foto, bio e redes sociais */}
+        <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
+
         {/* Modal de transferência */}
         <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
 
@@ -280,20 +364,33 @@ export default function Home() {
             <h2 className="sheet-title">Registrar Arte Urbana</h2>
             <p className="sheet-sub">Sua obra vira um NFT na Solana, na sua carteira.</p>
 
-            <div className="upload-zone" style={{ backgroundImage: imagePreview ? `url(${imagePreview})` : 'none' }}>
-              {!imagePreview && <span className="upload-ico">📷</span>}
-              {!imagePreview && <span>Escolha uma opção abaixo</span>}
+            {/* Só há um caminho pra mídia: a câmera ao vivo. Não existe input
+                de arquivo aqui de propósito — é o que garante que a obra foi
+                fotografada no local, e não baixada da internet. */}
+            <div className="upload-zone">
+              {media?.kind === 'video' ? (
+                <video className="upload-preview" src={media.previewUrl} muted loop autoPlay playsInline />
+              ) : media ? (
+                <img className="upload-preview" src={media.previewUrl} alt="Prévia da captura" />
+              ) : (
+                <>
+                  <span className="upload-ico">📷</span>
+                  <span>Registre a obra pela câmera</span>
+                </>
+              )}
             </div>
+
             <div className="upload-btns">
-              <label className="upload-btn">
-                📸 Tirar foto
-                <input type="file" accept="image/*" capture="environment" onChange={handleImageChange} disabled={isMinting} hidden />
-              </label>
-              <label className="upload-btn">
-                🖼️ Galeria
-                <input type="file" accept="image/*" onChange={handleImageChange} disabled={isMinting} hidden />
-              </label>
+              <button className="upload-btn" onClick={() => { sound.play('click'); setCameraOpen(true); }} disabled={isMinting}>
+                {media ? '🔄 Refazer captura' : '📸 Abrir câmera'}
+              </button>
             </div>
+
+            {!media && (
+              <p className="capture-note">
+                Só aceita foto ou vídeo feito agora, no local — é o que garante que a arte é real.
+              </p>
+            )}
 
             <input className="fld" placeholder="Nome do artista" value={nome} onChange={e=>setNome(e.target.value)} maxLength={50} disabled={isMinting} />
             <textarea className="fld" placeholder="Descrição da obra" value={descricao} onChange={e=>setDescricao(e.target.value)} rows={2} maxLength={200} disabled={isMinting} />

@@ -38,7 +38,12 @@ const nextConfig = {
       // O endpoint de stream redireciona (302) para nós de CDN variáveis da
       // rede descentralizada do Audius (audiusindex.org, figment.io, etc.) —
       // não dá pra prever/fixar os domínios, por isso libera qualquer https.
-      "media-src 'self' https:",
+      //
+      // `blob:` é a prévia do vídeo recém-gravado pela câmera
+      // (components/capture/CameraCapture.jsx): o MediaRecorder devolve um
+      // Blob e o <video> o consome por object URL. Sem isto o CSP bloqueia a
+      // prévia e o usuário grava sem conseguir conferir antes de registrar.
+      "media-src 'self' blob: https:",
       "frame-src 'none'",
       "frame-ancestors 'none'",
       "object-src 'none'",

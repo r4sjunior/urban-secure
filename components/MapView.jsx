@@ -4,6 +4,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import LikeButton from './LikeButton';
 import CollectButton from './CollectButton';
+import { googleMapsUrl } from '../lib/googleMaps';
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -165,15 +166,24 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       const safeArtist = escapeHtml(art.artistName || '');
       const solscanUrl = `https://solscan.io/token/${escapeHtml(art.id)}${network==='devnet'?'?cluster=devnet':''}`;
 
+      // Leva a pessoa até a obra de verdade — no celular abre o app nativo.
+      const mapsUrl = googleMapsUrl(art.lat, art.lng);
+      const perfilUrl = art.artistWallet ? `/perfil/${encodeURIComponent(art.artistWallet)}` : '';
+
       const popup = `<div class="art-popup">
         ${safeImg ? `<img src="${safeImg}" class="art-popup-img" data-full="${safeImg}" onerror="this.style.display='none'"/>` : ''}
         <strong>${safeName}</strong>
-        ${safeArtist ? `<em>por ${safeArtist}</em>` : ''}
+        ${safeArtist
+          ? perfilUrl
+            ? `<em>por <a href="${perfilUrl}" class="art-popup-artist">${safeArtist}</a></em>`
+            : `<em>por ${safeArtist}</em>`
+          : ''}
         <span>${safeDesc}</span>
         <div class="art-popup-actions">
           <div class="art-popup-like" data-post-id="${escapeHtml(art.id)}" data-artist-wallet="${escapeHtml(art.artistWallet)}"></div>
           <div class="art-popup-collect" data-post-id="${escapeHtml(art.id)}"></div>
         </div>
+        ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" rel="noreferrer" class="art-popup-link art-popup-maps">🧭 Como chegar</a>` : ''}
         <a href="${solscanUrl}" target="_blank" rel="noreferrer" class="art-popup-link">🔗 Ver no Solscan</a>
       </div>`;
 

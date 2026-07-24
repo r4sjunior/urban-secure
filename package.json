@@ -15,11 +15,14 @@
     }
   },
   "dependencies": {
+    "@metaplex-foundation/mpl-core": "^1.10.0",
     "@metaplex-foundation/mpl-token-metadata": "3.4.0",
     "@metaplex-foundation/mpl-toolbox": "^0.10.0",
     "@metaplex-foundation/umi": "1.5.1",
     "@metaplex-foundation/umi-bundle-defaults": "1.5.1",
     "@metaplex-foundation/umi-signer-wallet-adapters": "1.5.1",
+    "@react-three/drei": "^9.114.3",
+    "@react-three/fiber": "^8.17.10",
     "@solana/wallet-adapter-base": "0.9.27",
     "@solana/wallet-adapter-phantom": "0.9.29",
     "@solana/wallet-adapter-react": "0.15.39",
@@ -36,6 +39,7 @@
     "react": "^18",
     "react-dom": "^18",
     "stream-browserify": "3.0.0",
+    "three": "^0.169.0",
     "tweetnacl": "^1.0.3",
     "url": "0.11.3"
   },
