@@ -6,6 +6,8 @@
  */
 
 import nacl from 'tweetnacl';
+
+import { guardServerConfig } from '../../lib/serverConfig';
 import bs58 from 'bs58';
 import { buildRegistryMessage } from '../../lib/registrySignature';
 import { getLatestPin, mutatePin } from '../../lib/pinataStore';
@@ -66,6 +68,10 @@ export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
+
+  // Credencial inválida produz 502 "falha no upload" — que parece problema
+  // do arquivo do usuário. A guarda diz a verdade: é configuração.
+  if (guardServerConfig(res)) return;
 
   if (req.method === 'GET') {
     const arts = await getRegistryArts(jwt);

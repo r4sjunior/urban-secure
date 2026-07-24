@@ -29,6 +29,7 @@ import { guardServerConfig } from '../../lib/serverConfig';
 import { buildClaimMessage, claimDay } from '../../lib/social/claimSignature';
 import { evaluateClaim, emptyClaimState, applyClaim, reserveClaim } from '../../lib/social/claim';
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
+import { hasRegisteredArt } from '../../lib/social/hasRegisteredArt';
 import { getTreasuryBalance, transferFromTreasury } from '../../lib/treasury';
 import {
   LAMPORTS_PER_SOL,
@@ -204,8 +205,13 @@ export default async function handler(req, res) {
     //    receber qualquer coisa. Assinatura de carteira não ajudaria aqui —
     //    carteira nova é grátis e instantânea.
     if (REQUIRE_ART_BEFORE_FIRST_CLAIM && (state.totalClaims || 0) === 0) {
-      const list = Array.isArray(arts) ? arts : [];
-      if (!list.some(a => a?.artistWallet === wallet)) {
+      // Consulta o índice E a chain. O índice sozinho recusava usuários
+      // legítimos: o registro no Pinata acontece depois do mint, num
+      // try/catch que só loga, então a arte pode estar on-chain e fora do
+      // índice — e a mensagem culpava o usuário por uma falha nossa.
+      // Ver lib/social/hasRegisteredArt.js.
+      const temArte = await hasRegisteredArt(arts, wallet);
+      if (!temArte) {
         return res.status(403).json({
           error: 'Registre sua primeira arte para liberar o claim diário.',
           needsArt: true,

@@ -4,6 +4,8 @@
  * Valida conteúdo antes de encaminhar ao Pinata.
  */
 
+import { guardServerConfig } from '../../lib/serverConfig';
+
 export const config = {
   api: { bodyParser: { sizeLimit: '12mb' } },
 };
@@ -59,6 +61,10 @@ export default async function handler(req, res) {
 
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
+
+  // Credencial inválida produz 502 "falha no upload" — que parece problema
+  // do arquivo do usuário. A guarda diz a verdade: é configuração.
+  if (guardServerConfig(res)) return;
 
   try {
     const { type, data, filename, mime } = req.body || {};
