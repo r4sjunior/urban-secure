@@ -9,6 +9,7 @@
  */
 
 import { STREAK_TARGET } from '../../lib/config';
+import { Gift, Check } from 'lucide-react';
 
 export default function StreakTracker({ currentStreak = 0, nextIsClaimable = false }) {
   // Posição no ciclo. Streak 7 dá resto 0, mas representa um ciclo CHEIO —
@@ -33,7 +34,7 @@ export default function StreakTracker({ currentStreak = 0, nextIsClaimable = fal
               className={`streak-day${done ? ' done' : ''}${isNext ? ' next' : ''}${isLast ? ' last' : ''}`}
               title={isLast ? 'Fecha o ciclo e libera um pacote' : `Dia ${day}`}
             >
-              {isLast ? (done ? '🎁' : '🎁') : (done ? '✓' : day)}
+              {isLast ? <Gift className="lucide" /> : done ? <Check className="lucide" /> : day}
             </div>
           );
         })}

@@ -4,9 +4,11 @@
  * Toque no botão de local para centralizar o mapa na obra.
  */
 import { useState, useEffect } from 'react';
+import { X, Image, MapPin, Heart, Trophy, Medal } from 'lucide-react';
 
 const MAX_POSITIONS = 100;
-const TROPHIES = { 1: '🥇', 2: '🥈', 3: '🥉' };
+// Medalha para o pódio; o resto mostra a posição em número.
+const PODIUM = new Set([1, 2, 3]);
 
 export default function Leaderboard({ open, onClose, arts = [], onLocate }) {
   const [counts, setCounts] = useState({});
@@ -43,8 +45,8 @@ export default function Leaderboard({ open, onClose, arts = [], onLocate }) {
       <div className="lb-backdrop" onClick={onClose} />
       <div className="lb-panel">
         <div className="lb-header">
-          <h2 className="lb-title">🏆 Leaderboard</h2>
-          <button className="lb-close" onClick={onClose} title="Fechar">✕</button>
+          <h2 className="lb-title"><Trophy className="lucide" /> Mais curtidas</h2>
+          <button className="lb-close" onClick={onClose} title="Fechar"><X className="lucide" /></button>
         </div>
 
         {loading && ranked.length === 0 && (
@@ -55,32 +57,32 @@ export default function Leaderboard({ open, onClose, arts = [], onLocate }) {
         )}
 
         {!loading && ranked.length === 0 && (
-          <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro! 🎨</p>
+          <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro! <Image className="lucide" /></p>
         )}
 
         <div className="lb-list">
           {ranked.map((art, i) => {
             const rank = i + 1;
             const img = (art.imageUrl || '').startsWith('https://') ? art.imageUrl : '';
-            const trophy = TROPHIES[rank];
+            const isPodium = PODIUM.has(rank);
             return (
-              <div className={`lb-row ${trophy ? `lb-top lb-top-${rank}` : ''}`} key={art.id}>
-                <div className="lb-rank">{trophy || rank}</div>
+              <div className={`lb-row ${isPodium ? `lb-top lb-top-${rank}` : ''}`} key={art.id}>
+                <div className="lb-rank">{isPodium ? <Medal className="lucide" /> : rank}</div>
                 <div className="lb-thumb">
-                  {img ? <img src={img} alt={art.name || 'Arte'} loading="lazy" /> : <span>🎨</span>}
+                  {img ? <img src={img} alt={art.name || 'Arte'} loading="lazy" /> : <span><Image className="lucide" /></span>}
                 </div>
                 <div className="lb-info">
                   <span className="lb-name">{art.name}</span>
                   <span className="lb-artist">{art.artistName || 'Anônimo'}</span>
                 </div>
-                <div className="lb-likes">❤️ {art.likes}</div>
+                <div className="lb-likes"><Heart className="lucide" fill="currentColor" /> {art.likes}</div>
                 <button
                   className="lb-locate"
                   onClick={() => onLocate && onLocate(art)}
                   title="Ver no mapa"
                   aria-label="Ver no mapa"
                 >
-                  📍
+                  <MapPin className="lucide" />
                 </button>
               </div>
             );

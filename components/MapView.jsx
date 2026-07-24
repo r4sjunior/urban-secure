@@ -2,8 +2,16 @@ import { useEffect, useRef, useState, forwardRef, useImperativeHandle, useCallba
 import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletAuth } from '../context/WalletAuthContext';
+import { useTheme } from '../context/ThemeContext';
 import LikeButton from './LikeButton';
+import { LocateFixed } from 'lucide-react';
 import { googleMapsUrl } from '../lib/googleMaps';
+
+/** Variantes do mesmo basemap — trocadas conforme o tema ativo. */
+const TILES = {
+  dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
 
 function escapeHtml(str) {
   return String(str ?? '')
@@ -25,6 +33,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
+  const { theme } = useTheme();
+  const tileRef = useRef(null);
   const isAuthRef = useRef(isAuthenticated);
   const onPopupToggleRef = useRef(onPopupToggle);
   useEffect(() => { onPopupToggleRef.current = onPopupToggle; }, [onPopupToggle]);
@@ -88,15 +98,24 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       iconSize: [24,24], iconAnchor: [12,12],
     });
 
-    const map = L.map(containerRef.current, { zoomControl: true, attributionControl: false })
+    // O zoom padrão do Leaflet nasce em 'topleft', onde a nossa topbar
+    // flutuante o cobre por completo. Movido para a direita, ele forma um
+    // grupo vertical com o botão de GPS, longe da busca e do dock.
+    const map = L.map(containerRef.current, {
+      zoomControl: false,
+      attributionControl: false,
+    })
       .setView([-5.79, -35.21], 13);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
     mapRef.current = map;
     activeRef.current = true;
 
-    // Tiles escuros (CARTO dark) para combinar com o tema
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-    }).addTo(map);
+    // O CARTO publica variantes clara e escura do mesmo mapa. Trocar a
+    // CAMADA é muito melhor que inverter a escura por filtro CSS: o invert
+    // produz um cinza lavado, sem hierarquia entre via, quadra e água, e o
+    // mapa deixa de ser legível justamente no tema em que precisa de mais
+    // contraste. A camada é substituída no efeito de tema, logo abaixo.
+    tileRef.current = L.tileLayer(TILES.dark, { maxZoom: 20 }).addTo(map);
 
     // Agrupa pinos próximos numa bolha com contagem — ao afastar o zoom os
     // pinos não ficam mais se sobrepondo de forma bagunçada "fora do lugar".
@@ -126,6 +145,12 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       mapRef.current = markerRef.current = circleRef.current = clusterGroupRef.current = null;
     };
   }, []);
+
+  // Troca o basemap ao mudar de tema. setUrl() reaproveita a camada, então
+  // os tiles já em cache aparecem na hora, sem piscar o mapa inteiro.
+  useEffect(() => {
+    if (tileRef.current) tileRef.current.setUrl(TILES[theme] || TILES.dark);
+  }, [theme]);
 
   useEffect(() => {
     if (!mapRef.current || !clusterGroupRef.current || typeof window === 'undefined') return;
@@ -276,7 +301,9 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
           <span>Carregando artes…</span>
         </div>
       )}
-      <button className="gps-fab" onClick={() => startGPS()} title="Meu GPS">📍</button>
+      <button className="gps-fab" onClick={() => startGPS()} title="Centralizar no meu GPS" aria-label="Centralizar no meu GPS">
+        <LocateFixed className="lucide" />
+      </button>
 
       {/* Lightbox — imagem ampliada ao clicar na miniatura */}
       {lightbox && (

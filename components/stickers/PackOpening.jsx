@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { Gift, AlertTriangle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { sound } from '../../lib/sound';
 import StickerCard from './StickerCard';
@@ -103,7 +104,7 @@ export default function PackOpening({ open, onClose, onOpenPack, onRevealed }) {
       <div className="pack-stage">
         {phase === 'idle' && (
           <div className="pack-intro">
-            <div className="pack-intro-icon">🎁</div>
+            <div className="pack-intro-icon"><Gift className="lucide" /></div>
             <h2 className="pack-intro-title">Pacote de Figurinha</h2>
             <p className="pack-intro-sub">
               Você fechou 7 dias seguidos. Dentro tem uma arte registrada por
@@ -115,7 +116,7 @@ export default function PackOpening({ open, onClose, onOpenPack, onRevealed }) {
 
         {phase === 'opening' && (
           <div className="pack-intro">
-            <div className="pack-intro-icon pack-spin">🎁</div>
+            <div className="pack-intro-icon pack-spin"><Gift className="lucide" /></div>
             <p className="pack-intro-sub">Sorteando sua figurinha…</p>
           </div>
         )}
@@ -158,7 +159,7 @@ export default function PackOpening({ open, onClose, onOpenPack, onRevealed }) {
 
         {phase === 'error' && (
           <div className="pack-intro">
-            <div className="pack-intro-icon">⚠️</div>
+            <div className="pack-intro-icon"><AlertTriangle className="lucide" /></div>
             <p className="pack-intro-sub">{error}</p>
             <button className="btn-ghost" onClick={onClose}>Fechar</button>
           </div>

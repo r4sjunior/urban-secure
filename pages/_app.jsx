@@ -7,6 +7,7 @@ import { ArtsProvider } from '../context/ArtsContext';
 import { WalletAuthProvider } from '../context/WalletAuthContext';
 import { ProfileProvider } from '../context/ProfileContext';
 import { ClaimProvider } from '../context/ClaimContext';
+import { ThemeProvider } from '../context/ThemeContext';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 import '../styles/globals.css';
@@ -17,7 +18,8 @@ function Providers({ children }) {
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ThemeProvider>
+      <ConnectionProvider endpoint={endpoint}>
       <WalletProvider
         wallets={wallets}
         autoConnect
@@ -41,7 +43,8 @@ function Providers({ children }) {
           </WalletAuthProvider>
         </WalletModalProvider>
       </WalletProvider>
-    </ConnectionProvider>
+      </ConnectionProvider>
+    </ThemeProvider>
   );
 }
 

@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { Ban, X, SwitchCamera } from 'lucide-react';
 import { useCamera, MAX_VIDEO_MS } from '../../lib/capture/useCamera';
 import { sound } from '../../lib/sound';
 
@@ -105,7 +106,7 @@ export default function CameraCapture({ open, onCapture, onClose }) {
 
         {error && (
           <div className="camera-msg camera-err">
-            <span className="camera-err-icon">🚫</span>
+            <span className="camera-err-icon"><Ban className="lucide" /></span>
             <p>{error}</p>
             <p className="camera-err-why">
               O registro só aceita fotos feitas na hora — é o que garante que a arte
@@ -123,7 +124,7 @@ export default function CameraCapture({ open, onCapture, onClose }) {
           </div>
         )}
 
-        <button className="camera-close" onClick={() => { stop(); onClose(); }} aria-label="Fechar">✕</button>
+        <button className="camera-close" onClick={() => { stop(); onClose(); }} aria-label="Fechar"><X className="lucide" /></button>
       </div>
 
       <div className="camera-controls">
@@ -151,7 +152,7 @@ export default function CameraCapture({ open, onCapture, onClose }) {
             disabled={isRecording || busy || !stream}
             aria-label="Virar câmera"
           >
-            🔄
+            <SwitchCamera className="lucide" />
           </button>
 
           <button

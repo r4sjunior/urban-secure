@@ -9,14 +9,13 @@
  */
 
 import { SOCIAL_PLATFORMS } from '../../lib/config';
+import { AtSign } from 'lucide-react';
 import { socialUrl, normalizeSocialHandle } from '../../lib/social/profile';
 
-const ICONS = {
-  instagram: '📸',
-  x: '𝕏',
-  tiktok: '🎵',
-  farcaster: '🟣',
-};
+// O Lucide removeu os ícones de marca por licenciamento. Um arroba
+// genérico ao lado do handle comunica a mesma coisa e mantém o traço
+// consistente com o resto da interface.
+const SocialIcon = () => <AtSign className="lucide" />;
 
 /** Modo edição — um campo por plataforma. */
 export function SocialInputs({ socials, onChange, disabled }) {
@@ -24,7 +23,7 @@ export function SocialInputs({ socials, onChange, disabled }) {
     <div className="social-inputs">
       {Object.entries(SOCIAL_PLATFORMS).map(([key, cfg]) => (
         <label key={key} className="social-input">
-          <span className="social-input-icon" aria-hidden="true">{ICONS[key]}</span>
+          <span className="social-input-icon" aria-hidden="true"><SocialIcon /></span>
           <span className="social-input-prefix">@</span>
           <input
             className="social-input-fld"
@@ -66,7 +65,7 @@ export default function SocialLinks({ socials }) {
             // possa redirecionar a nossa aba (tabnabbing).
             rel="noopener noreferrer"
           >
-            <span aria-hidden="true">{ICONS[key]}</span>
+            <span aria-hidden="true"><SocialIcon /></span>
             <span className="social-chip-handle">@{handle}</span>
           </a>
         );

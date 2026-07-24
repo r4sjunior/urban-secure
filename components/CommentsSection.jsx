@@ -104,7 +104,7 @@ export default function CommentsSection({ postId, isAuthenticated = false }) {
           </div>
 
           {wallet.connected && !isAuthenticated ? (
-            <div className="auth-hint">✍️ Assine na carteira para comentar.</div>
+            <div className="auth-hint">Assine na carteira para comentar.</div>
           ) : (
             <form className="comment-input-row" onSubmit={handleSubmit}>
               <input
@@ -116,11 +116,11 @@ export default function CommentsSection({ postId, isAuthenticated = false }) {
                 maxLength={MAX_LEN}
               />
               <button className="comment-send" type="submit" disabled={posting || !text.trim() || !wallet.connected}>
-                {posting ? '⏳' : '➤'}
+                {posting ? '' : '➤'}
               </button>
             </form>
           )}
-          {error && <div className="like-error">⚠️ {error}</div>}
+          {error && <div className="like-error">{error}</div>}
         </div>
       )}
     </div>

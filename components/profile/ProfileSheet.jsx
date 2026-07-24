@@ -130,11 +130,11 @@ export default function ProfileSheet({ open, onClose }) {
             disabled={isSaving}
           />
 
-          {feedback === 'ok' && <div className="transfer-ok">✅ Perfil salvo!</div>}
-          {feedback && feedback !== 'ok' && <div className="err-box">⚠️ {feedback}</div>}
+          {feedback === 'ok' && <div className="transfer-ok">Perfil salvo!</div>}
+          {feedback && feedback !== 'ok' && <div className="err-box">{feedback}</div>}
 
           <button className="mint-cta" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? '⏳ Salvando…' : '💾 Salvar Perfil'}
+            {isSaving ? 'Salvando…' : 'Salvar perfil'}
           </button>
 
           <p className="fee-note">

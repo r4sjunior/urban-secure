@@ -5,6 +5,7 @@
  * próprio).
  */
 
+import { Check, Plus } from 'lucide-react';
 import { sound } from '../../lib/sound';
 
 export default function FollowButton({ follow }) {
@@ -23,7 +24,7 @@ export default function FollowButton({ follow }) {
         // desfazer o que a pessoa não quis desfazer.
         disabled={busy || isFollowing === null}
       >
-        {isFollowing === null ? '···' : isFollowing ? '✓ Seguindo' : '+ Seguir'}
+        {isFollowing === null ? '···' : isFollowing ? <><Check className="lucide" /> Seguindo</> : <><Plus className="lucide" /> Seguir</>}
       </button>
       {error && <span className="follow-err">{error}</span>}
     </div>

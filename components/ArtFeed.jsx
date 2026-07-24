@@ -5,6 +5,7 @@
  * e botão de localização que fecha o feed e centraliza o mapa na obra.
  */
 import Link from 'next/link';
+import { X, Image, MapPin, Navigation } from 'lucide-react';
 import LikeButton from './LikeButton';
 import CommentsSection from './CommentsSection';
 import FeedAvatar from './feed/FeedAvatar';
@@ -29,12 +30,12 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
       <div className="feed-panel">
         <div className="feed-header">
           <h2 className="feed-title">Feed</h2>
-          <button className="feed-close" onClick={onClose} title="Fechar">✕</button>
+          <button className="feed-close" onClick={onClose} title="Fechar"><X className="lucide" /></button>
         </div>
 
         <div className="feed-list">
           {sorted.length === 0 && (
-            <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro! 🎨</p>
+            <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro! <Image className="lucide" /></p>
           )}
 
           {sorted.map(art => {
@@ -64,13 +65,13 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
                     title="Ver no mapa"
                     aria-label="Ver no mapa"
                   >
-                    📍
+                    <MapPin className="lucide" />
                   </button>
                 </div>
 
                 <div className="feed-media">
                   {!media ? (
-                    <div className="feed-media-ph">🎨</div>
+                    <div className="feed-media-ph"><Image className="lucide" /></div>
                   ) : isVideoUrl(media) ? (
                     // Sem autoplay de propósito: um feed que dispara vários
                     // vídeos de uma vez queima o dado móvel do usuário e
@@ -92,7 +93,7 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
 
                   {mapsUrl && (
                     <a className="feed-maps" href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                      🧭 Como chegar até a obra
+                      <Navigation className="lucide" /> Como chegar até a obra
                     </a>
                   )}
 

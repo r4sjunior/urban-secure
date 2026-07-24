@@ -9,6 +9,7 @@
  */
 
 import { displayName, shortWallet } from '../../lib/social/profile';
+import { Pencil } from 'lucide-react';
 import { useFollow } from '../../lib/hooks/useFollow';
 import Avatar from './Avatar';
 import SocialLinks from './SocialLinks';
@@ -45,7 +46,7 @@ export default function ProfileCard({ profile, stats, wallet, isLoading, isSelf,
 
         {isSelf ? (
           <button className="btn-ghost profile-card-edit" onClick={onEdit}>
-            ✏️ Editar
+            <Pencil className="lucide" /> Editar
           </button>
         ) : (
           <FollowButton follow={follow} />

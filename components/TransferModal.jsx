@@ -91,11 +91,11 @@ export default function TransferModal({ open, onClose }) {
               disabled={status === 'sending'}
             />
 
-            {status === 'ok' && <div className="transfer-ok">✅ Arte enviada com sucesso!</div>}
-            {status && status !== 'sending' && status !== 'ok' && <div className="err-box">⚠️ {status}</div>}
+            {status === 'ok' && <div className="transfer-ok">Arte enviada com sucesso!</div>}
+            {status && status !== 'sending' && status !== 'ok' && <div className="err-box">{status}</div>}
 
             <button className="mint-cta" onClick={handleTransfer} disabled={status === 'sending'}>
-              {status === 'sending' ? '⏳ Enviando…' : '📤 Enviar Arte'}
+              {status === 'sending' ? 'Enviando…' : '📤 Enviar Arte'}
             </button>
             <p className="fee-note">Você paga apenas a taxa de gás (~0.001 SOL)</p>
           </>

@@ -12,6 +12,7 @@
  */
 
 import Link from 'next/link';
+import { Image } from 'lucide-react';
 import { rarityByKey } from '../../lib/stickers/rarity';
 
 export default function StickerCard({
@@ -35,7 +36,7 @@ export default function StickerCard({
       <div className="sticker-frame">
         {image
           ? <img className="sticker-img" src={image} alt={artistName} loading="lazy" />
-          : <span className="sticker-ph">🎨</span>}
+          : <span className="sticker-ph"><Image className="lucide" /></span>}
 
         {/* Brilho que varre a figurinha. Só em épico e lendário — se tudo
             brilhasse, brilho deixaria de significar raridade. */}

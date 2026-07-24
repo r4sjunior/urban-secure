@@ -17,7 +17,7 @@ export default function ClaimResultModal({ result, onDismiss }) {
     <div className="claim-result" onClick={onDismiss}>
       <div className="claim-result-card" onClick={e => e.stopPropagation()}>
         <div className={`claim-result-icon${result.completedCycle ? ' bonus' : ''}`}>
-          {result.completedCycle ? '🎁' : '⚡'}
+          {result.completedCycle ? <Gift className="lucide" /> : <Zap className="lucide" />}
         </div>
 
         <h3 className="claim-result-title">
@@ -27,7 +27,7 @@ export default function ClaimResultModal({ result, onDismiss }) {
         <p className="claim-result-amount">+{result.amountSol.toFixed(4)} SOL</p>
 
         <p className="claim-result-streak">
-          🔥 {result.streak} {result.streak === 1 ? 'dia seguido' : 'dias seguidos'}
+          <Flame className="lucide" /> {result.streak} {result.streak === 1 ? 'dia seguido' : 'dias seguidos'}
         </p>
 
         {result.packAvailable && (

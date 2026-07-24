@@ -8,11 +8,12 @@
  */
 
 import { STREAK_TARGET } from '../../lib/config';
+import { Image, Layers, Flame, Trophy, Medal, BarChart3 } from 'lucide-react';
 
-function Stat({ icon, value, label, hint, tone }) {
+function Stat({ Icon, value, label, hint, tone }) {
   return (
     <div className={`stat${tone ? ` stat-${tone}` : ''}`}>
-      <span className="stat-icon">{icon}</span>
+      <span className="stat-icon"><Icon className="lucide" /></span>
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
       {hint && <span className="stat-hint">{hint}</span>}
@@ -39,21 +40,23 @@ export default function StatsGrid({ stats, isLoading }) {
   // esconderia a dica justamente de quem está engajado.
   const toNextPack = STREAK_TARGET - (currentStreak % STREAK_TARGET);
 
-  const rankMedal = weeklyRank === 1 ? '🥇' : weeklyRank === 2 ? '🥈' : weeklyRank === 3 ? '🥉' : '📊';
+  // Medalha para o pódio, gráfico para o resto — a distinção visual
+  // precisa aparecer antes da leitura do número.
+  const rankMedal = weeklyRank && weeklyRank <= 3 ? Medal : BarChart3;
 
   return (
     <div className="stats-grid">
-      <Stat icon="🎨" value={artsRegistered} label="Artes" />
-      <Stat icon="🃏" value={stickersCollected} label="Figurinhas" />
+      <Stat Icon={Image} value={artsRegistered} label="Artes" />
+      <Stat Icon={Layers} value={stickersCollected} label="Figurinhas" />
       <Stat
-        icon="🔥"
+        Icon={Flame}
         value={currentStreak}
         label="Streak"
         hint={currentStreak > 0 && toNextPack > 0 ? `${toNextPack}d p/ pacote` : null}
         tone={currentStreak > 0 ? 'hot' : null}
       />
       <Stat
-        icon={rankMedal}
+        Icon={rankMedal}
         value={weeklyRank ? `#${weeklyRank}` : '—'}
         label="Ranking"
         hint={artsThisWeek > 0 ? `${artsThisWeek} na semana` : 'sem artes'}

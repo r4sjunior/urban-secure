@@ -73,7 +73,7 @@ export default function WalletHandler() {
   if (connected && publicKey && isSigning) {
     return (
       <button className="wallet-connect-btn wallet-sign-btn" disabled>
-        ✍️ Assinando na carteira…
+        Assinando na carteira…
       </button>
     );
   }
@@ -82,9 +82,9 @@ export default function WalletHandler() {
   if (connected && publicKey) {
     return (
       <div className="wallet-auth-wrap">
-        {authError && <span className="wallet-auth-err">⚠️ {authError}</span>}
+        {authError && <span className="wallet-auth-err">{authError}</span>}
         <button className="wallet-connect-btn wallet-sign-btn" onClick={authenticate}>
-          ✍️ Assinar para entrar
+          Assinar para entrar
         </button>
       </div>
     );
@@ -96,9 +96,9 @@ export default function WalletHandler() {
   }
 
   // ── DESCONECTADO ─────────────────────────────────────────────
-  let label = '👻 Conectar Phantom';
+  let label = 'Conectar Phantom';
   if (!isInstalled && !inPhantomBrowser()) {
-    label = mobile ? '👻 Abrir no Phantom' : '👻 Instalar Phantom';
+    label = mobile ? 'Abrir no Phantom' : 'Instalar Phantom';
   }
   return (
     <button className="wallet-connect-btn" onClick={handleConnect}>{label}</button>

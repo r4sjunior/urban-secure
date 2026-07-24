@@ -9,6 +9,7 @@
  */
 
 import { rarityByKey } from '../../lib/stickers/rarity';
+import { Image } from 'lucide-react';
 import StickerCard from './StickerCard';
 
 export default function AlbumGrid({ album, onPaste, isWorking }) {
@@ -59,7 +60,7 @@ export default function AlbumGrid({ album, onPaste, isWorking }) {
             >
               {slot.art.imageUrl
                 ? <img className="album-slot-ghost" src={slot.art.imageUrl} alt="" loading="lazy" />
-                : <span className="album-slot-ph">🎨</span>}
+                : <span className="album-slot-ph"><Image className="lucide" /></span>}
 
               <span className="album-slot-number">#{slot.albumNumber}</span>
 

@@ -169,8 +169,8 @@ export default function TradeModal({ open, onClose, duplicates, canTrade, onDone
               </button>
             </div>
 
-            {step && <div className="trade-step">⏳ {step}</div>}
-            {error && <div className="err-box">⚠️ {error}</div>}
+            {step && <div className="trade-step">{step}</div>}
+            {error && <div className="err-box">{error}</div>}
 
             {tab === 'received' && (
               pendentesRecebidas.length === 0
@@ -259,7 +259,7 @@ export default function TradeModal({ open, onClose, duplicates, canTrade, onDone
                   </p>
 
                   <button className="mint-cta" onClick={handlePropose} disabled={!!busy || !offered}>
-                    {busy === 'new' ? '⏳ Processando…' : '🔄 Propor troca'}
+                    {busy === 'new' ? 'Processando…' : 'Propor troca'}
                   </button>
                 </>
               )

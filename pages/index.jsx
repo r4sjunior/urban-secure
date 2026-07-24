@@ -6,12 +6,14 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useArts } from '../context/ArtsContext';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import { useMyProfile } from '../context/ProfileContext';
+import { SprayCan, Flame, Menu, Search, X, Plus, Send } from 'lucide-react';
+import UpdatesTicker from '../components/shell/UpdatesTicker';
+import { jaViuOnboarding } from '../components/shell/Onboarding';
 import { useClaim } from '../context/ClaimContext';
 import Avatar from '../components/profile/Avatar';
 import { resizeImage } from '../lib/resizeImage';
 import { buildRegistryMessage } from '../lib/registrySignature';
-import BootScreen from '../components/BootScreen';
-import SoundToggle from '../components/SoundToggle';
+import SplashScreen from '../components/shell/SplashScreen';
 import AudiusPlayer from '../components/AudiusPlayer';
 import ArtFeed from '../components/ArtFeed';
 import Leaderboard from '../components/Leaderboard';
@@ -23,6 +25,8 @@ const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: 
 const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
 const TransferModal= dynamic(() => import('../components/TransferModal'),{ ssr: false });
 const ProfileSheet = dynamic(() => import('../components/profile/ProfileSheet'), { ssr: false });
+const MenuSheet    = dynamic(() => import('../components/shell/MenuSheet'),      { ssr: false });
+const Onboarding   = dynamic(() => import('../components/shell/Onboarding'),     { ssr: false });
 const ClaimSheet   = dynamic(() => import('../components/claim/ClaimSheet'),     { ssr: false });
 const CameraCapture= dynamic(() => import('../components/capture/CameraCapture'),{ ssr: false });
 
@@ -108,6 +112,8 @@ export default function Home() {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
   const [muted, setMuted] = useState(() => (typeof window !== 'undefined' ? sound.isMuted() : true));
 
@@ -234,45 +240,42 @@ export default function Home() {
       <Head>
         <title>Urban Secure · Arte na Blockchain</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <meta name="theme-color" content="#0a0a0f" />
+        {/* Valor inicial; o ThemeContext o reescreve conforme o tema ativo. */}
+        <meta name="theme-color" content="#0A0B0D" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <link rel="manifest" href="/manifest.json" />
-        <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link rel="manifest" href="/manifest.json" />
       </Head>
 
-      {booting && <BootScreen onDone={() => setBooting(false)} />}
+      {booting && (
+        <SplashScreen
+          onDone={() => {
+            setBooting(false);
+            // Só depois da abertura sair — os dois ao mesmo tempo seriam
+            // duas telas cheias empilhadas.
+            if (!jaViuOnboarding()) setTourOpen(true);
+          }}
+        />
+      )}
 
       <div className="app">
         {/* Fundo animado */}
         <div className="bg-mesh" />
         <div className="bg-grid" />
 
-        {/* Topbar */}
+        {/* Topbar — só o que se usa em toda sessão. O resto vive no menu:
+            nove botões de 40px não cabem numa tela de celular sem virar
+            aquela fileira apertada de quadradinhos. */}
         <header className="topbar">
           <div className="brand">
-            <span className="brand-mark">◢◣</span>
+            <span className="brand-mark"><SprayCan className="lucide" /></span>
             <span className="brand-name">URBAN<span className="brand-accent">SECURE</span></span>
           </div>
+
           <div className="topbar-right">
             <div className={`gps-chip ${gpsClass}`}>
               <span className="gps-led" />{gpsLabel}
             </div>
-            <button className="feed-toggle" onClick={() => { sound.play('click'); setFeedOpen(true); }} title="Feed" aria-label="Feed">
-              🗞️
-            </button>
-            {/* Dois rankings distintos, e ambos importam: o 🏆 mede ARTISTAS
-                pela produção da semana (e paga SOL), o ❤️ mede OBRAS pelas
-                curtidas acumuladas. Fundir os dois apagaria uma das duas
-                leituras. */}
-            <Link href="/ranking" className="feed-toggle" title="Ranking semanal" aria-label="Ranking semanal">
-              🏆
-            </Link>
-            <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Mais curtidas" aria-label="Mais curtidas">
-              ❤️
-            </button>
-            <Link href="/album" className="feed-toggle" title="Álbum de figurinhas" aria-label="Álbum">
-              🃏
-            </Link>
+
             {wallet.connected && (
               <button
                 className={`streak-chip${claimStatus.canClaim ? ' ready' : ''}${claimStatus.streakAtRisk ? ' risk' : ''}`}
@@ -280,10 +283,11 @@ export default function Home() {
                 title={claimStatus.canClaim ? 'Resgate disponível' : 'Claim diário'}
                 aria-label="Claim diário"
               >
-                <span className="streak-chip-icon">🔥</span>
+                <Flame className="lucide" />
                 <span className="streak-chip-n">{claimStatus.currentStreak}</span>
               </button>
             )}
+
             {wallet.connected && (
               <button
                 className="profile-toggle"
@@ -291,15 +295,22 @@ export default function Home() {
                 title="Meu perfil"
                 aria-label="Meu perfil"
               >
-                <Avatar profile={profile} wallet={wallet.publicKey?.toBase58()} size={28} />
+                <Avatar profile={profile} wallet={wallet.publicKey?.toBase58()} size={30} />
                 {/* Ponto de atenção em quem ainda não preencheu o perfil — a
                     figurinha credita o artista pelo nome, então perfil vazio
                     é um custo real pro usuário, não só um campo em branco. */}
                 {!hasProfile && <span className="profile-toggle-dot" />}
               </button>
             )}
-            <AudiusPlayer muted={muted} />
-            <SoundToggle muted={muted} onToggle={handleToggleSound} />
+
+            <button
+              className="icon-btn"
+              onClick={() => { sound.play('click'); setMenuOpen(true); }}
+              title="Menu"
+              aria-label="Abrir menu"
+            >
+              <Menu className="lucide" />
+            </button>
           </div>
         </header>
 
@@ -307,22 +318,49 @@ export default function Home() {
         <main className={`map-stage${popupOpen ? ' popup-open' : ''}`}>
           <MapView onReady={handleMapReady} onLocationUpdate={handleLocationUpdate} onPopupToggle={setPopupOpen} arts={artsFiltradas} isLoading={isLoadingArts} />
 
-          {/* Busca flutuante */}
+          {/* Busca — pílula, com o ícone como elemento próprio em vez de
+              emoji dentro do placeholder (que não alinhava e não escalava) */}
           <div className="search-float">
-            <input className="search-in" placeholder="🔍 Buscar artista ou obra…" value={busca} onChange={e=>setBusca(e.target.value)} />
-            {busca && <button className="search-x" onClick={()=>setBusca('')}>✕</button>}
+            <span className="search-ico"><Search className="lucide" /></span>
+            <input
+              className="search-in"
+              placeholder="Buscar artista ou obra"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+            />
+            {busca && (
+              <button className="search-x" onClick={() => setBusca('')} aria-label="Limpar busca">
+                <X className="lucide" />
+              </button>
+            )}
           </div>
         </main>
+
+        {/* Novidades do app */}
+        {/* A trilha só toca com o componente montado; o controle de som
+            passou para o menu, então ele fica fora de vista, não removido. */}
+        <div className="audio-host"><AudiusPlayer muted={muted} /></div>
+
+        <UpdatesTicker />
 
         {/* Dock inferior */}
         <nav className="dock">
           <div className="dock-wallet"><WalletHandler /></div>
+
           {wallet.connected && isAuthenticated && (
-            <button className="dock-send" onClick={() => { sound.play('click'); setTransferOpen(true); }} title="Enviar arte">📤</button>
+            <button
+              className="dock-send"
+              onClick={() => { sound.play('click'); setTransferOpen(true); }}
+              title="Enviar arte"
+              aria-label="Enviar arte"
+            >
+              <Send className="lucide" />
+            </button>
           )}
+
           <button className="dock-cta" onClick={() => { sound.play('click'); setSheetOpen(true); }}>
-            <span className="dock-cta-icon">＋</span>
-            Registrar Arte
+            <Plus className="lucide" />
+            Registrar
           </button>
         </nav>
 
@@ -332,6 +370,20 @@ export default function Home() {
           onCapture={handleCapture}
           onClose={() => setCameraOpen(false)}
         />
+
+        {/* Navegação secundária */}
+        <MenuSheet
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onFeed={() => setFeedOpen(true)}
+          onLeaderboard={() => setLeaderboardOpen(true)}
+          onTutorial={() => setTourOpen(true)}
+          muted={muted}
+          onToggleSound={handleToggleSound}
+        />
+
+        {/* Tutorial da proposta do app */}
+        <Onboarding open={tourOpen} onClose={() => setTourOpen(false)} />
 
         {/* Claim diário — streak, resgate e regras */}
         <ClaimSheet open={claimOpen} onClose={() => setClaimOpen(false)} />
@@ -374,7 +426,7 @@ export default function Home() {
 
             <div className="upload-btns">
               <button className="upload-btn" onClick={() => { sound.play('click'); setCameraOpen(true); }} disabled={isMinting}>
-                {media ? '🔄 Refazer captura' : '📸 Abrir câmera'}
+                {media ? 'Refazer captura' : '📸 Abrir câmera'}
               </button>
             </div>
 
@@ -388,12 +440,12 @@ export default function Home() {
             <textarea className="fld" placeholder="Descrição da obra" value={descricao} onChange={e=>setDescricao(e.target.value)} rows={2} maxLength={200} disabled={isMinting} />
 
             {wallet.connected && !isAuthenticated && !isMinting && !mintError && (
-              <div className="auth-hint">✍️ Assine na carteira para registrar artes.</div>
+              <div className="auth-hint">Assine na carteira para registrar artes.</div>
             )}
-            {mintError && !isMinting && <div className="err-box">⚠️ {mintError}</div>}
+            {mintError && !isMinting && <div className="err-box">{mintError}</div>}
 
             <button className="mint-cta" onClick={handleMint} disabled={isMinting}>
-              {isMinting ? '⏳ Processando…' : '🎨 Mintar na Solana'}
+              {isMinting ? 'Processando…' : 'Mintar na Solana'}
             </button>
 
             <p className="fee-note">Você paga apenas a taxa de gás da rede (~0.01 SOL)</p>

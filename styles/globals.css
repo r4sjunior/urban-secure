@@ -1,55 +1,529 @@
-/* ═══════════════════════════════════════════════════════════
-   URBAN SECURE — Cyberpunk Refinado (só estética, lógica intacta)
-   ═══════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+/* ═══════════════════════════════════════════════════════════════════════
+   URBAN SECURE — Design System
+   ───────────────────────────────────────────────────────────────────────
+   Tokens em duas camadas: uma PALETA crua (cinzas, ciano) e um conjunto
+   SEMÂNTICO que aponta pra ela (--surface, --text, --border). Só a camada
+   semântica é usada nos componentes — é isso que permite trocar o tema
+   inteiro redefinindo ~15 variáveis, em vez de caçar cor por cor.
+   ═══════════════════════════════════════════════════════════════════════ */
 
-:root{
-  --bg:#0A0B0D;--bg-1:#0E1013;--bg-2:#14171C;--bg-3:#1A1E24;
-  --surface:rgba(20,23,28,.72);--border:rgba(255,255,255,.07);--border-2:rgba(255,255,255,.12);
-  --text:#ECEFF4;--muted:#8A93A2;--faint:#5A626E;
-  --accent:#2DD4BF;--accent-dim:rgba(45,212,191,.12);--accent-bd:rgba(45,212,191,.30);
-  --violet:#8B7CF6;--green:#34D399;--amber:#FBBF24;--danger:#FB7185;
-  --r-sm:10px;--r-md:14px;--r-lg:20px;--r-xl:26px;
-  --shadow:0 16px 50px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.4);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+:root {
+  /* ── Paleta ─────────────────────────────────────────────────────────
+     Escala de cinza com leve viés azul: cinza neutro puro sobre um mapa
+     escuro parece sujo, e o viés frio conversa com o ciano da marca. */
+  --gray-950: #0A0B0D;
+  --gray-900: #101216;
+  --gray-850: #16191F;
+  --gray-800: #1C2027;
+  --gray-700: #262B34;
+  --gray-500: #6B7280;
+  --gray-400: #9CA3AF;
+  --gray-200: #E5E7EB;
+  --gray-100: #F3F4F6;
+  --gray-50:  #FAFAFB;
+  --white:    #FFFFFF;
+
+  --cyan:       #00E5D0;
+  --cyan-bright:#00F2FE;
+  --violet:     #8B7CF6;
+  --green:      #00FF88;
+  --amber:      #FBBF24;
+  --danger:     #FB7185;
+
+  /* ── Espaçamento — escala de 4px ───────────────────────────────────
+     Uma escala fixa é o que dá ritmo visual. Valores avulsos (13px aqui,
+     18px ali) são a diferença entre "limpo" e "quase certo". */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+  /* ── Raio ─────────────────────────────────────────────────────────── */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-2xl: 32px;
+  --r-pill: 9999px;
+
+  /* ── Tipografia ───────────────────────────────────────────────────── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', var(--font-sans);
+
+  /* ── Transições ───────────────────────────────────────────────────── */
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  --t-fast: .18s var(--ease);
+  --t-med: .3s var(--ease);
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body,#__next{height:100%;width:100%;overflow:hidden}
-body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 
-.app{position:relative;height:100dvh;width:100%;overflow:hidden;display:flex;flex-direction:column}
-.bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(60% 50% at 15% 0%,rgba(45,212,191,.05),transparent 60%),radial-gradient(50% 50% at 90% 10%,rgba(139,124,246,.05),transparent 60%)}
-.bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(ellipse 90% 70% at 50% 30%,#000 40%,transparent 80%)}
+/* ── TEMA ESCURO (padrão) ───────────────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-.topbar{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;padding-top:max(14px,env(safe-area-inset-top));background:linear-gradient(180deg,rgba(10,11,13,.9),rgba(10,11,13,.4) 70%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
-.brand{display:flex;align-items:center;gap:9px}
-.brand-mark{font-size:15px;color:var(--accent);opacity:.9;letter-spacing:-1px}
-.brand-name{font-family:'Space Grotesk';font-weight:700;font-size:18px;letter-spacing:.5px}
-.brand-accent{color:var(--accent)}
-.gps-chip{display:flex;align-items:center;gap:7px;font-family:'Space Grotesk';font-size:11px;font-weight:500;padding:6px 12px;border-radius:100px;background:var(--surface);border:1px solid var(--border);backdrop-filter:blur(8px);color:var(--muted)}
-.gps-led{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.gps-chip.wait .gps-led{background:var(--amber);animation:blink 1.4s infinite}
-.gps-chip.ok .gps-led{background:var(--accent);box-shadow:0 0 6px var(--accent)}
-.gps-chip.ok{color:var(--text)}
-.gps-chip.err .gps-led{background:var(--danger)}
-@keyframes blink{50%{opacity:.3}}
+  --bg:      var(--gray-950);
+  --bg-1:    var(--gray-900);
+  --bg-2:    var(--gray-850);
+  --bg-3:    var(--gray-800);
 
-.map-stage{position:relative;z-index:1;flex:1;min-height:0}
-.map-skeleton{width:100%;height:100%;background:linear-gradient(135deg,#0E1013 25%,#14171C 50%,#0E1013 75%);background-size:400% 400%;animation:shimmer 1.6s infinite}
-@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
-.leaflet-container{background:#0A0B0D!important;font-family:'Inter',sans-serif!important}
-.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border:1px solid var(--border)!important;backdrop-filter:blur(8px)}
-.leaflet-control-zoom a:hover{background:var(--bg-3)!important}
-.me-marker{position:relative;width:22px;height:22px}
-.me-dot{position:absolute;inset:6px;background:var(--accent);border-radius:50%;border:2px solid #0A0B0D;box-shadow:0 0 10px var(--accent)}
-.me-pulse{position:absolute;inset:0;border-radius:50%;background:var(--accent);opacity:.35;animation:pulse 2.2s ease-out infinite}
-@keyframes pulse{0%{transform:scale(.5);opacity:.45}100%{transform:scale(2.2);opacity:0}}
-.art-pin{position:relative;width:44px;height:52px}
-.art-pin-body{position:absolute;top:0;left:2px;width:40px;height:40px;overflow:hidden;background:var(--pc,var(--accent));border-radius:50% 50% 50% 5px;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.9);box-shadow:0 5px 14px rgba(0,0,0,.5)}
-.art-pin-body span{transform:rotate(45deg);font-size:15px}
-.art-pin-img{width:100%;height:100%;object-fit:cover;border-radius:50% 50% 50% 5px;transform:rotate(45deg)}
-.art-pin-shadow{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:14px;height:4px;background:rgba(0,0,0,.5);border-radius:50%;filter:blur(2px)}
-.marker-cluster-custom{display:flex;align-items:center;justify-content:center;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--bg-3),var(--bg-1));border:2px solid var(--accent-bd);box-shadow:0 6px 18px rgba(0,0,0,.5),0 0 0 6px var(--accent-dim);color:var(--accent);font-family:'Space Grotesk';font-weight:700;font-size:14px;transition:transform .15s}
-.marker-cluster-custom:hover{transform:scale(1.08)}
+  /* Superfícies de vidro. A opacidade sobe conforme o elemento "flutua"
+     mais alto — é o que dá hierarquia sem precisar de borda. */
+  --glass:        rgba(16, 18, 22, .62);
+  --glass-strong: rgba(16, 18, 22, .82);
+  --glass-soft:   rgba(38, 43, 52, .55);
+  --glass-hover:  rgba(56, 62, 74, .72);
+
+  --text:  #F2F4F8;
+  --muted: #98A0AE;
+  --faint: #626B7A;
+
+  /* Divisórias quase invisíveis. Bordas de 1px sólidas foram o que
+     deixava a interface com cara de tabela HTML — aqui a separação vem
+     de contraste de superfície, não de linha. */
+  --border:   rgba(255, 255, 255, .06);
+  --border-2: rgba(255, 255, 255, .11);
+
+  --accent:        var(--cyan);
+  --accent-bright: var(--cyan-bright);
+  --accent-dim:    rgba(0, 229, 208, .12);
+  --accent-bd:     rgba(0, 229, 208, .32);
+  --on-accent:     #052A2A;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, .35);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, .45);
+  --shadow-lg: 0 20px 56px rgba(0, 0, 0, .55), 0 2px 10px rgba(0, 0, 0, .4);
+  --glow: 0 4px 20px rgba(0, 242, 254, .4);
+
+}
+
+/* ── TEMA CLARO ─────────────────────────────────────────────────────── */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:   var(--gray-50);
+  --bg-1: var(--white);
+  --bg-2: var(--gray-100);
+  --bg-3: var(--gray-200);
+
+  --glass:        rgba(255, 255, 255, .72);
+  --glass-strong: rgba(255, 255, 255, .9);
+  --glass-soft:   rgba(255, 255, 255, .8);
+  --glass-hover:  rgba(255, 255, 255, .95);
+
+  --text:  #0F1319;
+  --muted: #5A6472;
+  --faint: #8A94A3;
+
+  --border:   rgba(15, 19, 25, .08);
+  --border-2: rgba(15, 19, 25, .14);
+
+  /* Ciano escurecido no claro. O #00F2FE sobre branco tem contraste ~1.4:1
+     e some — o texto ficaria ilegível para qualquer pessoa, não só para
+     quem tem baixa visão. */
+  --accent:        #00A99B;
+  --accent-bright: #00BFB3;
+  --accent-dim:    rgba(0, 169, 155, .1);
+  --accent-bd:     rgba(0, 169, 155, .28);
+  --on-accent:     #FFFFFF;
+
+  --shadow-sm: 0 2px 8px rgba(15, 19, 25, .06);
+  --shadow-md: 0 8px 28px rgba(15, 19, 25, .1);
+  --shadow-lg: 0 20px 56px rgba(15, 19, 25, .14), 0 2px 10px rgba(15, 19, 25, .06);
+  --glow: 0 4px 20px rgba(0, 169, 155, .32);
+
+  /* O tile do mapa é escuro por natureza. Inverter e recolorir é o truque
+     padrão para não precisar de um segundo provedor de tiles. */
+}
+
+/* Sem preferência salva, segue o sistema. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: var(--gray-50);        --bg-1: var(--white);
+    --bg-2: var(--gray-100);     --bg-3: var(--gray-200);
+    --glass: rgba(255,255,255,.72);       --glass-strong: rgba(255,255,255,.9);
+    --glass-soft: rgba(255,255,255,.8);   --glass-hover: rgba(255,255,255,.95);
+    --text: #0F1319; --muted: #5A6472; --faint: #8A94A3;
+    --border: rgba(15,19,25,.08); --border-2: rgba(15,19,25,.14);
+    --accent: #00A99B; --accent-bright: #00BFB3;
+    --accent-dim: rgba(0,169,155,.1); --accent-bd: rgba(0,169,155,.28);
+    --on-accent: #FFFFFF;
+    --shadow-sm: 0 2px 8px rgba(15,19,25,.06);
+    --shadow-md: 0 8px 28px rgba(15,19,25,.1);
+    --shadow-lg: 0 20px 56px rgba(15,19,25,.14), 0 2px 10px rgba(15,19,25,.06);
+    --glow: 0 4px 20px rgba(0,169,155,.32);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #__next { height: 100%; width: 100%; overflow: hidden; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--t-med), color var(--t-med);
+}
+
+/* Ícones Lucide. O stroke fica em 1.75 — 1.5 some contra o fundo escuro
+   em telas de baixa densidade, 2 pesa demais ao lado da Inter. */
+.lucide { width: 20px; height: 20px; stroke-width: 1.75; flex-shrink: 0; display: block; }
+.icon-btn .lucide, .dock-icon .lucide { pointer-events: none; }
+
+/* Qualquer botão com ícone: círculo perfeito, conteúdo centrado.
+   `.feed-toggle` é o nome herdado dos botões do topo — mantido como alias
+   para não precisar renomear a classe em cada componente. */
+.icon-btn,
+.feed-toggle,
+.profile-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex-shrink: 0; padding: 0;
+  border: none; border-radius: 50%;
+  background: var(--glass-soft);
+  color: var(--muted);
+  cursor: pointer;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.icon-btn:hover, .feed-toggle:hover, .profile-toggle:hover { background: var(--glass-hover); color: var(--accent); }
+.icon-btn:active, .feed-toggle:active, .profile-toggle:active { transform: scale(.9); }
+.icon-btn:focus-visible, .feed-toggle:focus-visible, .profile-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Link estilizado como botão precisa do reset de decoração. */
+a.icon-btn, a.feed-toggle { text-decoration: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SHELL — header, busca, controles do mapa, dock
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.app { position: relative; height: 100dvh; width: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+/* Brilho ambiente. Sutil o bastante para ser percebido como profundidade,
+   não como decoração. */
+.bg-mesh {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 12% -5%, rgba(0, 229, 208, .07), transparent 62%),
+    radial-gradient(55% 50% at 92% 8%, rgba(139, 124, 246, .06), transparent 60%);
+}
+.bg-grid { display: none; } /* a grade quadriculada era o que dava cara de wireframe */
+
+/* ── HEADER ─────────────────────────────────────────────────────────────
+   Uma barra fluida só, flutuando sobre o mapa. Sem borda inferior: a
+   separação vem do blur e da sombra, que é o que faz parecer vidro em vez
+   de uma faixa colada. */
+.topbar {
+  position: absolute;
+  top: max(var(--sp-3), env(safe-area-inset-top));
+  left: var(--sp-3); right: var(--sp-3);
+  z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sp-3);
+  height: 56px;
+  padding: 0 var(--sp-2) 0 var(--sp-4);
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+.brand { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.brand-mark { display: flex; align-items: center; color: var(--accent); }
+.brand-mark .lucide { width: 22px; height: 22px; stroke-width: 2; }
+.brand-name {
+  font-family: var(--font-display); font-weight: 700; font-size: 15px;
+  letter-spacing: -.2px; white-space: nowrap;
+}
+.brand-accent { color: var(--accent); }
+
+.topbar-right { display: flex; align-items: center; gap: var(--sp-1); }
+
+/* Chip de GPS — some em telas estreitas, onde os botões importam mais. */
+.gps-chip {
+  display: flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 11px;
+  border-radius: var(--r-pill);
+  background: var(--glass-soft);
+  font-family: var(--font-display); font-size: 11px; font-weight: 500;
+  color: var(--muted); white-space: nowrap;
+}
+.gps-led { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.gps-chip.wait .gps-led { background: var(--amber); animation: blink 1.4s infinite; }
+.gps-chip.ok    .gps-led { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.gps-chip.ok    { color: var(--text); }
+.gps-chip.err   .gps-led { background: var(--danger); }
+@keyframes blink { 50% { opacity: .3 } }
+
+/* Todos os botões de ícone do topo herdam .icon-btn (círculo perfeito). */
+.profile-toggle { position: relative; }
+.profile-toggle .avatar { width: 30px; height: 30px; }
+.profile-toggle-dot {
+  position: absolute; top: 1px; right: 1px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--amber); border: 2px solid var(--bg);
+  animation: blink 2s infinite;
+}
+
+/* Chip de streak: mesma altura dos botões redondos, formato de pílula
+   porque carrega um número junto do ícone. */
+.streak-chip {
+  display: flex; align-items: center; gap: 5px;
+  height: 40px; padding: 0 13px; flex-shrink: 0;
+  border: none; border-radius: var(--r-pill);
+  background: var(--glass-soft); color: var(--muted);
+  cursor: pointer; backdrop-filter: blur(10px);
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.streak-chip:active { transform: scale(.94); }
+.streak-chip .lucide { width: 17px; height: 17px; }
+.streak-chip-n { font-family: var(--font-display); font-size: 13px; font-weight: 700; line-height: 1; }
+.streak-chip.ready {
+  background: var(--accent-dim); color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-bd);
+  animation: streakPulse 2.4s ease-in-out infinite;
+}
+.streak-chip.risk {
+  background: rgba(251, 191, 36, .12); color: var(--amber);
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, .34);
+}
+@keyframes streakPulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent-bd), 0 0 0 0 rgba(0, 229, 208, .3) }
+  50%      { box-shadow: 0 0 0 1px var(--accent-bd), 0 0 0 7px rgba(0, 229, 208, 0) }
+}
+
+/* ── MAPA ─────────────────────────────────────────────────────────────── */
+.map-stage { position: relative; z-index: 1; flex: 1; min-height: 0; }
+.map-skeleton {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, var(--bg-1) 25%, var(--bg-2) 50%, var(--bg-1) 75%);
+  background-size: 400% 400%; animation: shimmer 1.6s infinite;
+}
+@keyframes shimmer { 0% { background-position: 100% 50% } 100% { background-position: 0 50% } }
+
+.leaflet-container { background: var(--bg) !important; font-family: var(--font-sans) !important; }
+/* Sem filtro no mapa: o tema claro usa a camada clara do CARTO
+   (components/MapView.jsx § TILES), que é desenhada para isso. Inverter a
+   camada escura deixava tudo num cinza uniforme e ilegível. */
+
+/* ── BUSCA — pílula, com espaço para respirar ──────────────────────── */
+.search-float {
+  position: absolute;
+  /* Acima dos panes do Leaflet. A busca vive DENTRO de .map-stage, no mesmo
+     contexto de empilhamento dos panes do mapa — que usam z-index 400 a 700.
+     Com o valor anterior (15) ela era desenhada ATRÁS do mapa e ficava
+     invisível, apesar de estar no lugar certo e marcada como visível. */
+  z-index: 900;
+  top: calc(max(var(--sp-3), env(safe-area-inset-top)) + 56px + var(--sp-3));
+  left: var(--sp-3); right: var(--sp-3);
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 46px; padding: 0 var(--sp-5);
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, .05);
+  transition: box-shadow var(--t-fast);
+}
+.search-float:focus-within { box-shadow: var(--shadow-md), 0 0 0 1.5px var(--accent-bd); }
+.search-ico { color: var(--faint); display: flex; }
+.search-ico .lucide { width: 18px; height: 18px; }
+.search-in {
+  flex: 1; min-width: 0; height: 100%;
+  border: none; background: none; outline: none;
+  color: var(--text); font-family: var(--font-sans); font-size: 14px;
+}
+.search-in::placeholder { color: var(--faint); }
+.search-x {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: var(--glass-soft); color: var(--muted); cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.search-x:hover { background: var(--glass-hover); color: var(--text); }
+.search-x .lucide { width: 14px; height: 14px; }
+
+/* ── ZOOM — widget flutuante próprio, longe da busca ───────────────── */
+.leaflet-control-zoom,
+.leaflet-bar {
+  border: none !important;
+  border-radius: var(--r-md) !important;
+  overflow: hidden;
+  background: var(--glass) !important;
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: var(--shadow-md) !important;
+}
+.leaflet-control-zoom a,
+.leaflet-bar a {
+  width: 40px !important; height: 40px !important;
+  line-height: 40px !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 19px !important; font-weight: 400 !important;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.leaflet-control-zoom a:hover,
+.leaflet-bar a:hover { background: var(--glass-hover) !important; color: var(--accent) !important; }
+/* Divisória implícita entre + e −: mudança de fundo, não linha de 1px. */
+.leaflet-control-zoom a:first-child { box-shadow: inset 0 -1px 0 var(--border); }
+.leaflet-control-zoom-in  { border-radius: var(--r-md) var(--r-md) 0 0 !important; }
+.leaflet-control-zoom-out { border-radius: 0 0 var(--r-md) var(--r-md) !important; }
+
+/* Coluna da direita: zoom em cima, GPS embaixo. O offset acompanha a
+   altura real do dock (62) + ticker (36) + respiros, para nunca encostar. */
+.leaflet-bottom.leaflet-right {
+  right: var(--sp-3);
+  bottom: calc(max(var(--sp-4), env(safe-area-inset-bottom)) + 62px + 36px + var(--sp-4) + 42px + var(--sp-2));
+}
+.leaflet-bottom.leaflet-right .leaflet-control { margin: 0; }
+.leaflet-control-attribution {
+  background: var(--glass) !important;
+  color: var(--faint) !important;
+  border-radius: var(--r-pill) !important;
+  padding: 2px 10px !important; font-size: 9px !important;
+  backdrop-filter: blur(8px);
+}
+.leaflet-control-attribution a { color: var(--muted) !important; }
+
+/* ── MARCADORES ───────────────────────────────────────────────────────
+   Glow e sombra projetada fazem os pinos flutuarem sobre o mapa. Sem
+   isso eles parecem impressos no tile. */
+.me-marker { position: relative; width: 22px; height: 22px; }
+.me-dot {
+  position: absolute; inset: 6px;
+  background: var(--green); border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .9);
+  filter: drop-shadow(0 0 8px var(--green));
+}
+.me-pulse {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: var(--green); opacity: .3;
+  animation: pulse 2.4s ease-out infinite;
+}
+@keyframes pulse {
+  0%   { transform: scale(.5); opacity: .4 }
+  100% { transform: scale(2.4); opacity: 0 }
+}
+
+.art-pin { position: relative; width: 44px; height: 52px; }
+.art-pin-body {
+  position: absolute; top: 0; left: 2px;
+  width: 40px; height: 40px; overflow: hidden;
+  background: var(--pc, var(--accent));
+  border-radius: 50% 50% 50% 5px;
+  transform: rotate(-45deg);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(255, 255, 255, .92);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .5), 0 2px 4px rgba(0, 0, 0, .3);
+  transition: transform var(--t-fast);
+}
+.art-pin:hover .art-pin-body { transform: rotate(-45deg) scale(1.08); }
+.art-pin-body span { transform: rotate(45deg); font-size: 15px; }
+.art-pin-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50% 50% 50% 5px; transform: rotate(45deg); }
+.art-pin-shadow {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 16px; height: 5px; background: rgba(0, 0, 0, .45);
+  border-radius: 50%; filter: blur(3px);
+}
+
+.marker-cluster-custom {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; border-radius: 50%;
+  background: var(--glass-strong);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .45), 0 0 0 1px var(--accent-bd), 0 0 0 7px var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--font-display); font-weight: 700; font-size: 14px;
+  transition: transform var(--t-fast);
+}
+.marker-cluster-custom:hover { transform: scale(1.08); }
+
+/* ── DOCK ─────────────────────────────────────────────────────────────
+   Flutua com margem de segurança em todos os lados — encostar na borda
+   é o que fazia parecer barra de navegador antiga. */
+.dock {
+  position: absolute; z-index: 20;
+  left: var(--sp-4); right: var(--sp-4);
+  bottom: max(var(--sp-4), env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--r-xl);
+  background: var(--glass);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+.dock-wallet { flex: 1; min-width: 0; }
+
+.dock-send {
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; flex-shrink: 0;
+  border: none; border-radius: var(--r-md);
+  background: var(--glass-soft); color: var(--muted);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
+}
+.dock-send:hover { background: var(--glass-hover); color: var(--accent); }
+.dock-send:active { transform: scale(.92); }
+
+/* CTA principal: ciano sólido, texto escuro, elevação por sombra neon.
+   Sem gradiente — o gradiente duro era o principal traço "anos 2000". */
+.dock-cta {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  height: 46px; padding: 0 var(--sp-5); flex-shrink: 0;
+  border: none; border-radius: var(--r-md);
+  background: var(--accent-bright);
+  color: var(--on-accent);
+  font-family: var(--font-display); font-size: 14px; font-weight: 700;
+  letter-spacing: -.1px; white-space: nowrap; cursor: pointer;
+  box-shadow: var(--glow);
+  transition: transform var(--t-fast), box-shadow var(--t-fast), filter var(--t-fast);
+}
+.dock-cta:hover { filter: brightness(1.06); box-shadow: 0 6px 26px rgba(0, 242, 254, .5); }
+.dock-cta:active { transform: scale(.97); box-shadow: 0 2px 12px rgba(0, 242, 254, .35); }
+.dock-cta .lucide { width: 18px; height: 18px; stroke-width: 2.25; }
+
+/* Carteira: o wallet-adapter injeta o próprio botão; forçamos a mesma
+   linguagem visual do resto do dock. */
+.wallet-adapter-button {
+  width: 100% !important; height: 46px !important;
+  border-radius: var(--r-md) !important;
+  background: var(--glass-soft) !important;
+  color: var(--text) !important;
+  font-family: var(--font-display) !important;
+  font-size: 13px !important; font-weight: 600 !important;
+  padding: 0 var(--sp-4) !important;
+  transition: background var(--t-fast) !important;
+}
+.wallet-adapter-button:not([disabled]):hover { background: var(--glass-hover) !important; }
+.wallet-adapter-button-start-icon { display: none !important; }
+.wallet-skeleton { height: 46px; border-radius: var(--r-md); background: var(--glass-soft); }
+
+@media (max-width: 400px) {
+  .gps-chip { display: none; }
+  .topbar { padding-right: var(--sp-1); gap: var(--sp-2); }
+  .dock-cta { padding: 0 var(--sp-4); font-size: 13px; }
+}
+
+
+
 .art-popup-wrap .leaflet-popup-content-wrapper{background:var(--bg-2);color:var(--text);border:1px solid var(--border-2);border-radius:var(--r-md);box-shadow:var(--shadow)}
 .art-popup-wrap .leaflet-popup-tip{background:var(--bg-2)}
 .art-popup{font-family:'Inter',sans-serif;min-width:180px;max-width:220px;max-height:70vh;overflow-y:auto}
@@ -64,37 +538,24 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .map-loading{position:absolute;inset:0;z-index:650;background:rgba(10,11,13,.55);backdrop-filter:blur(3px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .map-spinner{width:38px;height:38px;border-radius:50%;border:2.5px solid var(--border-2);border-top-color:var(--accent);animation:spin .8s linear infinite}
 .map-loading span{font-size:13px;font-weight:500;color:var(--muted)}
-.gps-fab{position:absolute;bottom:16px;right:14px;z-index:600;width:46px;height:46px;border-radius:var(--r-md);background:var(--surface);backdrop-filter:blur(10px);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:transform .15s,border-color .2s,opacity .2s}
+/* Botão de GPS e controle de zoom formam UMA coluna na direita. O offset
+   inferior soma dock + ticker: antes o GPS ficava a 16px do fundo, ou seja,
+   por cima do dock — e com z-index 600 ele ganhava a sobreposição. */
+.gps-fab{position:absolute;right:var(--sp-3);bottom:calc(max(var(--sp-4),env(safe-area-inset-bottom)) + 62px + 36px + var(--sp-4));z-index:600;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border:none;border-radius:var(--r-md);background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--muted);cursor:pointer;box-shadow:var(--shadow-md);transition:background var(--t-fast),color var(--t-fast),transform var(--t-fast)}
 .gps-fab:active{transform:scale(.92)}
-.gps-fab:hover{border-color:var(--accent-bd)}
-.search-float{position:absolute;top:14px;left:14px;right:66px;z-index:600;display:flex;align-items:center;transition:opacity .2s}
+.gps-fab:hover{background:var(--glass-hover);color:var(--accent)}
 
 /* ── Quando um popup de arte está aberto e centralizado, some com o que
    flutua sobre o mapa (busca, contador, GPS) pra nada sobrepor o card ── */
 .map-stage.popup-open .search-float,
 .map-stage.popup-open .map-counter,
-.map-stage.popup-open .gps-fab{opacity:0;pointer-events:none}
 
-.search-in{width:100%;padding:11px 14px;border-radius:var(--r-md);background:var(--surface);backdrop-filter:blur(10px);border:1px solid var(--border);color:var(--text);font-size:13px;font-family:'Inter';outline:none;transition:border-color .2s}
-.search-in:focus{border-color:var(--accent-bd)}
-.search-in::placeholder{color:var(--faint)}
-.search-x{position:absolute;right:8px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.1);color:var(--text);border:none;cursor:pointer;font-size:11px}
 .lightbox{position:fixed;inset:0;z-index:3000;background:rgba(5,6,8,.94);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .2s}
 .lightbox img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:var(--r-md);box-shadow:var(--shadow)}
 .lightbox-close{position:absolute;top:22px;right:22px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.1);color:var(--text);border:1px solid var(--border-2);font-size:18px;cursor:pointer}
 @keyframes fade{from{opacity:0}}
 
-.dock{position:relative;z-index:5;display:flex;align-items:center;gap:10px;padding:14px 18px;padding-bottom:max(14px,env(safe-area-inset-bottom));background:linear-gradient(0deg,rgba(10,11,13,.95),rgba(10,11,13,.5) 70%,transparent);backdrop-filter:blur(14px);border-top:1px solid var(--border)}
-.dock-wallet{flex:1;min-width:0}
-.dock-send{width:48px;height:48px;flex-shrink:0;border-radius:var(--r-md);border:1px solid var(--border-2);background:var(--bg-2);color:var(--text);font-size:18px;cursor:pointer;transition:transform .15s,border-color .2s}
-.dock-send:active{transform:scale(.92)}
-.dock-send:hover{border-color:var(--accent-bd)}
-.dock-cta{display:flex;align-items:center;gap:8px;padding:13px 20px;border-radius:var(--r-md);border:none;background:var(--accent);color:#04201C;font-family:'Space Grotesk';font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;transition:transform .15s,filter .2s;box-shadow:0 6px 20px rgba(45,212,191,.22)}
-.dock-cta:active{transform:scale(.96)}
-.dock-cta:hover{filter:brightness(1.08)}
-.dock-cta-icon{font-size:18px;font-weight:400}
 
-.wallet-skeleton{height:46px;border-radius:var(--r-md);background:rgba(255,255,255,.05)}
 .wallet-connect-btn{width:100%;height:46px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-md);border:1px solid var(--border-2);background:var(--bg-2);color:var(--text);font-family:'Space Grotesk';font-size:13px;font-weight:600;cursor:pointer;transition:transform .15s,border-color .2s,background .2s;text-decoration:none}
 .wallet-connect-btn:hover{border-color:var(--accent-bd);background:var(--bg-3)}
 .wallet-connect-btn:active{transform:scale(.97)}
@@ -262,18 +723,12 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 @keyframes spin{to{transform:rotate(360deg)}}
 
 @media (min-width:768px){
-  .topbar{padding:16px 32px}
-  .dock{padding:16px 32px;max-width:560px;margin:0 auto;width:100%}
-  .search-float{max-width:380px}
   .sheet-panel,.transfer-panel{max-width:480px;left:50%;transform:translateX(-50%) translateY(100%);border-radius:var(--r-xl);bottom:20px}
   .sheet.open .sheet-panel{transform:translateX(-50%) translateY(0)}
   .ov-card{max-width:400px}
 }
 @media (min-width:1200px){.dock{max-width:640px}}
 @media (max-width:360px){
-  .brand-name{font-size:16px}
-  .dock-cta{padding:13px 16px;font-size:13px}
-  .gps-chip{font-size:10px;padding:5px 10px}
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -322,9 +777,6 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .sound-toggle:not(.off){border-color:var(--accent-bd);box-shadow:0 0 14px rgba(45,212,191,.25)}
 @media (max-width:360px){.sound-toggle{width:36px;height:36px;font-size:14px}}
 
-.feed-toggle{width:40px;height:40px;flex-shrink:0;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:16px;cursor:pointer;backdrop-filter:blur(8px);transition:transform .15s,border-color .2s;display:flex;align-items:center;justify-content:center}
-.feed-toggle:hover{border-color:var(--accent-bd)}
-.feed-toggle:active{transform:scale(.92)}
 @media (max-width:360px){.feed-toggle{width:36px;height:36px;font-size:14px}}
 
 
@@ -422,10 +874,6 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .avatar-ring{box-shadow:0 0 0 2px var(--bg-1),0 0 0 3px var(--accent-bd)}
 
 /* Botão de perfil na topbar — mesma caixa do .feed-toggle pra alinhar. */
-.profile-toggle{position:relative;width:40px;height:40px;flex-shrink:0;padding:0;border-radius:50%;background:var(--surface);border:1px solid var(--border);cursor:pointer;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:transform .15s,border-color .2s}
-.profile-toggle:hover{border-color:var(--accent-bd)}
-.profile-toggle:active{transform:scale(.92)}
-.profile-toggle-dot{position:absolute;top:-1px;right:-1px;width:10px;height:10px;border-radius:50%;background:var(--amber);border:2px solid var(--bg);animation:blink 2s infinite}
 
 /* Grid de estatísticas */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px}
@@ -519,20 +967,9 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
    ═══════════════════════════════════════════════════════════ */
 
 /* Chip de streak na topbar. Mesma altura do .feed-toggle pra alinhar. */
-.streak-chip{display:flex;align-items:center;gap:4px;height:40px;padding:0 11px;flex-shrink:0;border-radius:100px;background:var(--surface);border:1px solid var(--border);color:var(--text);cursor:pointer;backdrop-filter:blur(8px);transition:transform .15s,border-color .2s,background .2s}
-.streak-chip:active{transform:scale(.94)}
-.streak-chip-icon{font-size:14px;line-height:1;filter:grayscale(1) opacity(.5)}
-.streak-chip-n{font-family:'Space Grotesk';font-size:13px;font-weight:700;line-height:1}
 /* Resgate disponível: o chip acende e pulsa. É o único elemento da topbar
    que chama atenção sozinho — reservado pro que o usuário pode fazer agora. */
-.streak-chip.ready{border-color:var(--accent-bd);background:var(--accent-dim);animation:streakPulse 2.4s ease-in-out infinite}
-.streak-chip.ready .streak-chip-icon{filter:none}
-.streak-chip.ready .streak-chip-n{color:var(--accent)}
 /* Streak prestes a morrer vence a cor de "disponível": é mais urgente. */
-.streak-chip.risk{border-color:rgba(251,191,36,.45);background:rgba(251,191,36,.1)}
-.streak-chip.risk .streak-chip-icon{filter:none}
-.streak-chip.risk .streak-chip-n{color:var(--amber)}
-@keyframes streakPulse{0%,100%{box-shadow:0 0 0 0 rgba(45,212,191,.25)}50%{box-shadow:0 0 0 6px rgba(45,212,191,0)}}
 
 /* Trilha do ciclo de 7 dias */
 .streak-tracker{margin-bottom:18px}
@@ -580,7 +1017,6 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 @keyframes popIn{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:scale(1)}}
 
 @media (max-width:380px){
-  .streak-chip{padding:0 8px;gap:3px}
   .streak-day{font-size:11px}
   .streak-trail{gap:4px}
 }
@@ -701,7 +1137,11 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 /* Slot vazio mostra a silhueta da obra que falta — ver o que falta motiva
    mais que um quadrado cinza anônimo. */
 .album-slot.empty{background:var(--bg-2);border:1.5px dashed var(--border-2);display:flex;align-items:center;justify-content:center}
-.album-slot-ghost{width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.32);opacity:.5}
+/* Silhueta LEGÍVEL. O valor anterior (brightness .32 + opacity .5) deixava
+   a arte que falta praticamente preta — um quadrado escuro não comunica
+   "esta você ainda não tem", só parece imagem quebrada. */
+.album-slot-ghost{width:100%;height:100%;object-fit:cover;filter:grayscale(.85) brightness(.62) contrast(.9);opacity:.75;transition:filter var(--t-med),opacity var(--t-med)}
+.album-slot.empty:hover .album-slot-ghost{filter:grayscale(.4) brightness(.82);opacity:.95}
 .album-slot-ph{font-size:22px;opacity:.2}
 .album-slot-number{position:absolute;top:5px;left:5px;font-family:'Space Grotesk';font-size:10px;font-weight:700;color:var(--faint)}
 .album-slot.pastable{border-color:var(--accent);border-style:solid;animation:streakPulse 2.2s ease-in-out infinite}
@@ -812,3 +1252,404 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .follow-err{font-size:10.5px;color:var(--danger)}
 .follow-counts{display:flex;gap:16px;margin-bottom:12px;font-size:13px;color:var(--muted)}
 .follow-counts strong{font-family:'Space Grotesk';color:var(--text)}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ABERTURA, TUTORIAL E NOVIDADES
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.splash {
+  position: fixed; inset: 0; z-index: 4000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: var(--sp-8) var(--sp-6);
+  background: var(--bg);
+  opacity: 1;
+  transition: opacity .4s var(--ease), transform .4s var(--ease);
+}
+.splash.out { opacity: 0; transform: scale(1.04); pointer-events: none; }
+
+.splash-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(46% 34% at 50% 22%, rgba(0, 229, 208, .16), transparent 68%),
+    radial-gradient(40% 30% at 78% 76%, rgba(139, 124, 246, .1), transparent 66%);
+}
+
+.splash-body {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  width: 100%; max-width: 380px;
+}
+
+.splash-mark {
+  display: flex; align-items: center; justify-content: center;
+  width: 66px; height: 66px; margin-bottom: var(--sp-5);
+  border-radius: var(--r-xl);
+  background: var(--accent-dim);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-bd), 0 12px 40px rgba(0, 229, 208, .22);
+  animation: splashMark .7s var(--ease) both;
+}
+.splash-mark .lucide { width: 32px; height: 32px; stroke-width: 1.75; }
+@keyframes splashMark {
+  from { opacity: 0; transform: translateY(14px) scale(.86) }
+  to   { opacity: 1; transform: none }
+}
+
+.splash-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 8vw, 36px); font-weight: 700;
+  letter-spacing: -1px; line-height: 1;
+  animation: splashUp .6s var(--ease) both .1s;
+}
+.splash-title-accent { color: var(--accent); }
+
+.splash-tagline {
+  margin: var(--sp-2) 0 var(--sp-8);
+  font-size: 13.5px; color: var(--muted); text-align: center; line-height: 1.5;
+  animation: splashUp .6s var(--ease) both .2s;
+}
+@keyframes splashUp {
+  from { opacity: 0; transform: translateY(12px) }
+  to   { opacity: 1; transform: none }
+}
+
+.splash-pilares { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; }
+.splash-pilar {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--glass-soft);
+  animation: splashUp .55s var(--ease) both;
+}
+.splash-pilar-ico {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  border-radius: var(--r-sm);
+  background: var(--accent-dim); color: var(--accent);
+}
+.splash-pilar-ico .lucide { width: 18px; height: 18px; }
+.splash-pilar-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.splash-pilar-txt strong { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; }
+.splash-pilar-txt small { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+
+.splash-skip {
+  position: absolute; z-index: 2;
+  bottom: max(var(--sp-8), env(safe-area-inset-bottom));
+  padding: var(--sp-3) var(--sp-8);
+  border: none; border-radius: var(--r-pill);
+  background: var(--glass-soft); color: var(--text);
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  cursor: pointer; backdrop-filter: blur(10px);
+  animation: splashUp .5s var(--ease) both 1s;
+  transition: background var(--t-fast);
+}
+.splash-skip:hover { background: var(--glass-hover); }
+
+/* ── TUTORIAL ─────────────────────────────────────────────────────────── */
+.tour {
+  position: fixed; inset: 0; z-index: 3500;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: var(--sp-4);
+  background: rgba(4, 5, 7, .82);
+  backdrop-filter: blur(10px);
+  animation: fadeIn .25s var(--ease);
+}
+@media (min-width: 560px) { .tour { align-items: center; } }
+
+.tour-card {
+  position: relative;
+  width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--sp-8) var(--sp-6) var(--sp-5);
+  border-radius: var(--r-2xl);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
+  animation: tourIn .4s var(--ease);
+}
+@keyframes tourIn {
+  from { opacity: 0; transform: translateY(24px) scale(.97) }
+  to   { opacity: 1; transform: none }
+}
+
+.tour-skip {
+  position: absolute; top: var(--sp-4); right: var(--sp-4);
+  padding: 6px 12px; border: none; border-radius: var(--r-pill);
+  background: none; color: var(--faint);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.tour-skip:hover { color: var(--text); background: var(--glass-soft); }
+
+.tour-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 62px; height: 62px; margin-bottom: var(--sp-5);
+  border-radius: var(--r-xl);
+  background: var(--accent-dim); color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-bd);
+}
+.tour-icon .lucide { width: 28px; height: 28px; }
+
+.tour-text { text-align: center; animation: splashUp .35s var(--ease); }
+.tour-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: var(--sp-2); }
+.tour-desc { font-size: 14px; line-height: 1.6; color: var(--muted); }
+
+.tour-dots { display: flex; gap: 6px; margin: var(--sp-6) 0 var(--sp-5); }
+.tour-dot {
+  width: 7px; height: 7px; padding: 0;
+  border: none; border-radius: var(--r-pill);
+  background: var(--border-2); cursor: pointer;
+  transition: all var(--t-med);
+}
+.tour-dot.on { width: 22px; background: var(--accent); }
+
+.tour-next { width: 100%; }
+
+/* ── TICKER DE NOVIDADES ──────────────────────────────────────────────
+   Fica ACIMA do dock, não colado no rodapé: o dock é a área de ação e
+   não pode disputar espaço com texto em movimento. */
+.ticker {
+  position: absolute; z-index: 18;
+  left: var(--sp-4); right: var(--sp-4);
+  bottom: calc(max(var(--sp-4), env(safe-area-inset-bottom)) + 62px + var(--sp-3));
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 36px; padding: 0 var(--sp-1) 0 var(--sp-3);
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.ticker-label {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  color: var(--accent);
+}
+.ticker-label .lucide { width: 13px; height: 13px; }
+.ticker-version {
+  font-family: var(--font-display); font-size: 9.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+
+.ticker-viewport { flex: 1; min-width: 0; overflow: hidden; position: relative; }
+/* Esfumaça as pontas para o texto não "cortar" na borda dura. */
+.ticker-viewport::before,
+.ticker-viewport::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 20px; z-index: 1; pointer-events: none;
+}
+.ticker-viewport::before { left: 0;  background: linear-gradient(90deg, var(--bg-1), transparent); opacity: .55; }
+.ticker-viewport::after  { right: 0; background: linear-gradient(270deg, var(--bg-1), transparent); opacity: .55; }
+
+.ticker-track {
+  display: flex; align-items: center; width: max-content;
+  animation: tickerScroll 46s linear infinite;
+}
+.ticker:hover .ticker-track { animation-play-state: paused; }
+.ticker-clone { display: flex; align-items: center; }
+
+/* -50% porque o conteúdo está duplicado: ao fim do ciclo a cópia está
+   exatamente onde o original começou, e o loop não tem emenda. */
+@keyframes tickerScroll {
+  from { transform: translateX(0) }
+  to   { transform: translateX(-50%) }
+}
+
+.ticker-item {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 0 var(--sp-5);
+  font-size: 11.5px; color: var(--muted); white-space: nowrap;
+}
+.ticker-tag {
+  padding: 2px 7px; border-radius: var(--r-pill);
+  background: var(--accent-dim); color: var(--accent);
+  font-family: var(--font-display); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+
+.ticker-close {
+  display: flex; align-items: center; justify-content: center;
+  /* 30px reais em vez de 22px + área simulada: o pseudo-elemento maior que
+     o botão inflava o scrollWidth dele e transbordava a faixa. */
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: none; border-radius: 50%;
+  background: none; color: var(--faint); cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.ticker-close:hover { background: var(--glass-soft); color: var(--text); }
+.ticker-close .lucide { width: 12px; height: 12px; }
+
+@media (max-width: 400px) {
+  .ticker-version { display: none; }
+  .ticker { left: var(--sp-3); right: var(--sp-3); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MENU — navegação secundária
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.audio-host { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+.menu { position: fixed; inset: 0; z-index: 2200; }
+.menu-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(4, 5, 7, .6);
+  backdrop-filter: blur(6px);
+  animation: fadeIn .22s var(--ease);
+}
+.menu-panel {
+  position: absolute; left: var(--sp-3); right: var(--sp-3);
+  bottom: max(var(--sp-3), env(safe-area-inset-bottom));
+  padding: var(--sp-5);
+  border-radius: var(--r-2xl);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
+  animation: slideUp .34s var(--ease);
+}
+@media (min-width: 560px) {
+  .menu-panel { left: auto; right: var(--sp-4); width: 340px; }
+}
+
+.menu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-4); }
+.menu-title { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+
+/* Atalhos principais em grade — alvos grandes, rótulo junto do ícone. */
+.menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: none; border-radius: var(--r-md);
+  background: var(--glass-soft); color: var(--text);
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  text-align: left; text-decoration: none; cursor: pointer;
+  transition: background var(--t-fast), transform var(--t-fast);
+}
+.menu-item:hover { background: var(--glass-hover); }
+.menu-item:active { transform: scale(.97); }
+.menu-item-ico {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: var(--r-sm);
+  background: var(--accent-dim); color: var(--accent);
+}
+.menu-item-ico .lucide { width: 17px; height: 17px; }
+
+/* Preferências em lista — leitura em linha, com o estado à direita. */
+.menu-list { display: flex; flex-direction: column; }
+.menu-row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-2);
+  border: none; background: none; color: var(--text);
+  font-family: var(--font-sans); font-size: 13.5px; text-align: left;
+  cursor: pointer; border-radius: var(--r-sm);
+  transition: background var(--t-fast);
+}
+.menu-row:hover { background: var(--glass-soft); }
+.menu-row .lucide { width: 18px; height: 18px; color: var(--muted); }
+.menu-row > span:first-of-type { flex: 1; }
+.menu-row-hint { font-size: 11.5px; color: var(--faint); }
+
+.menu-version {
+  margin-top: var(--sp-4); padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  font-size: 10.5px; color: var(--faint); text-align: center;
+}
+
+@keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CAIXAS DE MENSAGEM
+   O ícone vem do CSS, não de emoji no JSX: são doze lugares diferentes que
+   mostram erro ou confirmação, e um SVG aqui mantém todos idênticos sem
+   importar Lucide em cada um.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.err-box, .transfer-ok, .claim-warn, .claim-bonus-note, .trade-step {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 11px 14px; margin-bottom: 10px;
+  border-radius: var(--r-md);
+  font-size: 13px; line-height: 1.45;
+}
+.err-box::before, .transfer-ok::before, .claim-warn::before,
+.claim-bonus-note::before, .trade-step::before {
+  content: ''; flex-shrink: 0;
+  width: 17px; height: 17px; margin-top: 1px;
+  background-color: currentColor;
+  -webkit-mask-size: contain; mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+}
+
+/* Máscaras SVG inline — mesmo traço do Lucide (stroke 1.75, cantos redondos) */
+.err-box::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E");
+}
+.transfer-ok::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.801 10A10 10 0 1 1 17 3.335'/%3E%3Cpath d='m9 11 3 3L22 4'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.801 10A10 10 0 1 1 17 3.335'/%3E%3Cpath d='m9 11 3 3L22 4'/%3E%3C/svg%3E");
+}
+.claim-warn::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13' r='8'/%3E%3Cpath d='M12 9v4l2 2'/%3E%3Cpath d='M5 3 2 6'/%3E%3Cpath d='m22 6-3-3'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13' r='8'/%3E%3Cpath d='M12 9v4l2 2'/%3E%3Cpath d='M5 3 2 6'/%3E%3Cpath d='m22 6-3-3'/%3E%3C/svg%3E");
+}
+.claim-bonus-note::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='8' width='18' height='4' rx='1'/%3E%3Cpath d='M12 8v13'/%3E%3Cpath d='M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7'/%3E%3Cpath d='M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='8' width='18' height='4' rx='1'/%3E%3Cpath d='M12 8v13'/%3E%3Cpath d='M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7'/%3E%3Cpath d='M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5'/%3E%3C/svg%3E");
+}
+.trade-step::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-6.219-8.56'/%3E%3C/svg%3E");
+  animation: spin 1s linear infinite;
+}
+
+/* Ícones que giram enquanto algo carrega */
+.lucide.spin, .spin > .lucide, .ov-step-icon.spin .lucide { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg) } }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ÁREA DE TOQUE
+   ───────────────────────────────────────────────────────────────────────
+   Alguns controles precisam ser visualmente pequenos (um X discreto, um
+   ponto de paginação) mas continuam sendo alvo de dedo. A área clicável é
+   expandida por ::after — o elemento cresce para o toque sem crescer para
+   o olho. Aumentar padding resolveria o toque e estragaria o layout.
+
+   Referência: 44x44 é o mínimo confortável para polegar (guideline da
+   Apple); o WCAG 2.5.8 aceita 24x24 como piso.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.tour-skip,
+.tour-dot,
+.search-x,
+.profile-card-addr,
+.lb-close,
+.feed-close { position: relative; }
+
+.tour-skip::after,
+.tour-dot::after,
+.search-x::after,
+.profile-card-addr::after,
+.lb-close::after,
+.feed-close::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  /* Não intercepta o clique do que está por baixo além do necessário. */
+  border-radius: inherit;
+}
+
+/* O ponto de paginação é minúsculo por design; a área precisa ser bem maior
+   que ele, e os pontos vizinhos não podem se sobrepor. */
+.tour-dots { gap: 10px; padding: 6px 0; }
+.tour-dot::after { width: 34px; height: 34px; }
+
+/* Link do endereço no perfil: texto pequeno, alvo grande. */
+.profile-card-addr { display: inline-flex; align-items: center; padding: 5px 0; }
+
+@media (pointer: coarse) {
+  /* Em tela de toque, o mínimo sobe para os controles de ícone. */
+  .icon-btn, .feed-toggle, .profile-toggle { width: 42px; height: 42px; }
+  .streak-chip { height: 42px; }
+}

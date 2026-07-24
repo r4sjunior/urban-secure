@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { Gift, Zap, Loader2 } from 'lucide-react';
 import { formatCountdown } from '../../lib/social/claim';
 import { sound } from '../../lib/sound';
 
@@ -37,7 +38,7 @@ export default function ClaimButton({ status, isClaiming, onClaim, disabled }) {
   const ready = canClaim || remaining === 0;
 
   if (isClaiming) {
-    return <button className="mint-cta" disabled>⏳ Resgatando…</button>;
+    return <button className="mint-cta" disabled><Loader2 className="lucide spin" /> Resgatando…</button>;
   }
 
   if (!ready) {
@@ -56,8 +57,8 @@ export default function ClaimButton({ status, isClaiming, onClaim, disabled }) {
       disabled={disabled}
     >
       {willCompleteCycle
-        ? `🎁 Resgatar ${amountSol.toFixed(4)} SOL + pacote`
-        : `⚡ Resgatar ${amountSol.toFixed(4)} SOL`}
+        ? <><Gift className="lucide" /> Resgatar {amountSol.toFixed(4)} SOL + pacote</>
+        : <><Zap className="lucide" /> Resgatar {amountSol.toFixed(4)} SOL</>}
     </button>
   );
 }

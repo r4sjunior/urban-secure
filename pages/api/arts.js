@@ -88,7 +88,16 @@ export default async function handler(req, res) {
     // Merge sem duplicatas (por id)
     const map = new Map();
     [...registry, ...helius].forEach(a => { if (a?.id) map.set(a.id, a); });
-    const arts = Array.from(map.values()).filter(a => !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng)));
+    // Além das coordenadas, exige imagem utilizável: registros sem imagem
+    // (upload que falhou, asset de teste) apareciam como retângulos pretos
+    // no mapa e no feed.
+    const arts = Array.from(map.values()).filter(a =>
+      !isNaN(parseFloat(a.lat)) &&
+      !isNaN(parseFloat(a.lng)) &&
+      typeof a.imageUrl === 'string' &&
+      a.imageUrl.startsWith('https://') &&
+      !/QmTest|placeholder/i.test(a.imageUrl)
+    );
 
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=120');
     return res.status(200).json({ arts, total: arts.length });

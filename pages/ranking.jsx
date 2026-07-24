@@ -8,6 +8,7 @@
  */
 
 import Head from 'next/head';
+import { ArrowLeft, Medal } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
@@ -15,7 +16,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import Avatar from '../components/profile/Avatar';
 import { WEEKLY_PRIZE_SOL } from '../lib/config';
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+// Medalha no pódio; posição em número no restante.
+const PODIUM = 3;
 
 /** "2d 14h 03min" — a granularidade cai conforme o prazo aperta, pra que os
  *  segundos só apareçam quando realmente importam. */
@@ -73,7 +75,8 @@ export default function RankingPage() {
       <Head>
         <title>Ranking Semanal · Urban Secure</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="theme-color" content="#0a0a0f" />
+        {/* Valor inicial; o ThemeContext o reescreve conforme o tema ativo. */}
+        <meta name="theme-color" content="#0A0B0D" />
       </Head>
 
       <div className="profile-page">
@@ -81,7 +84,7 @@ export default function RankingPage() {
         <div className="bg-grid" />
 
         <header className="profile-topbar">
-          <button className="btn-ghost" onClick={() => router.push('/')}>← Mapa</button>
+          <button className="btn-ghost" onClick={() => router.push('/')}><ArrowLeft className="lucide" /> Mapa</button>
         </header>
 
         <main className="profile-main">
@@ -108,11 +111,11 @@ export default function RankingPage() {
 
           {showPrevious && data?.payout && (
             <div className="rank-paid">
-              ✅ Premiação paga em {new Date(data.payout.paidAt).toLocaleDateString('pt-BR')}
+              Premiação paga em {new Date(data.payout.paidAt).toLocaleDateString('pt-BR')}
             </div>
           )}
           {showPrevious && data && !data.payout && (
-            <div className="rank-pending">⏳ Premiação ainda não processada.</div>
+            <div className="rank-pending">Premiação ainda não processada.</div>
           )}
 
           {isLoading ? (
@@ -142,11 +145,11 @@ export default function RankingPage() {
               <ol className="rank-list">
                 {entries.map(entry => {
                   const isMe = entry.wallet === me;
-                  const medal = MEDALS[entry.position - 1];
+                  const isPodium = entry.position <= PODIUM;
 
                   return (
-                    <li key={entry.wallet} className={`rank-row${medal ? ' podium' : ''}${isMe ? ' me' : ''}`}>
-                      <span className="rank-pos">{medal || entry.position}</span>
+                    <li key={entry.wallet} className={`rank-row${isPodium ? ' podium' : ''}${isMe ? ' me' : ''}`}>
+                      <span className="rank-pos">{isPodium ? <Medal className="lucide" /> : entry.position}</span>
 
                       <Link href={`/perfil/${encodeURIComponent(entry.wallet)}`} className="rank-user">
                         <Avatar

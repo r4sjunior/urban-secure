@@ -13,6 +13,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { Camera, Loader2 } from 'lucide-react';
 import { cropSquareAvatar } from '../../lib/social/avatar';
 import { uploadFile } from '../../lib/mint';
 import Avatar from './Avatar';
@@ -87,7 +88,7 @@ export default function AvatarUpload({ wallet, handle, avatarUrl, onChange, disa
           ? <img className="avatar avatar-ring" style={{ width: 88, height: 88 }} src={shown} alt="" />
           : <Avatar profile={{ handle, avatarUrl: '' }} wallet={wallet} size={88} ring />}
 
-        <span className="avatar-upload-badge">{uploading ? '⏳' : '📷'}</span>
+        <span className="avatar-upload-badge">{uploading ? <Loader2 className="lucide spin" /> : <Camera className="lucide" />}</span>
       </button>
 
       <div className="avatar-upload-side">

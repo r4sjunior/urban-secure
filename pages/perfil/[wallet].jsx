@@ -8,6 +8,7 @@
  */
 
 import { useRouter } from 'next/router';
+import { Image, ArrowLeft } from 'lucide-react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -50,7 +51,7 @@ export default function ProfilePage() {
       <div className="profile-page">
         <div className="profile-empty">
           <p>Endereço de carteira inválido.</p>
-          <Link href="/" className="btn-ghost">← Voltar ao mapa</Link>
+          <Link href="/" className="btn-ghost"><ArrowLeft className="lucide" /> Voltar ao mapa</Link>
         </div>
       </div>
     );
@@ -62,7 +63,8 @@ export default function ProfilePage() {
         <title>{`${name} · Urban Secure`}</title>
         <meta name="description" content={profile?.bio || `Artes urbanas registradas por ${name}.`} />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="theme-color" content="#0a0a0f" />
+        {/* Valor inicial; o ThemeContext o reescreve conforme o tema ativo. */}
+        <meta name="theme-color" content="#0A0B0D" />
       </Head>
 
       <div className="profile-page">
@@ -70,7 +72,7 @@ export default function ProfilePage() {
         <div className="bg-grid" />
 
         <header className="profile-topbar">
-          <button className="btn-ghost" onClick={() => router.push('/')}>← Mapa</button>
+          <button className="btn-ghost" onClick={() => router.push('/')}><ArrowLeft className="lucide" /> Mapa</button>
         </header>
 
         <main className="profile-main">
@@ -104,7 +106,7 @@ export default function ProfilePage() {
                 >
                   {art.imageUrl
                     ? <img src={art.imageUrl} alt={art.name} loading="lazy" />
-                    : <span className="profile-art-ph">🎨</span>}
+                    : <span className="profile-art-ph"><Image className="lucide" /></span>}
                   <span className="profile-art-meta">{timeAgo(art.timestamp)}</span>
                 </Link>
               ))}

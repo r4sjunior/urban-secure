@@ -77,7 +77,7 @@ export default function ClaimSheet({ open, onClose }) {
                   que salvar. */}
               {status.streakAtRisk && (
                 <div className="claim-warn">
-                  ⏰ Seu streak de {status.currentStreak}{' '}
+                  Seu streak de {status.currentStreak}{' '}
                   {status.currentStreak === 1 ? 'dia acaba' : 'dias acaba'} em{' '}
                   <strong>{formatCountdown(status.streakExpiresAt - Date.now())}</strong>
                 </div>
@@ -85,11 +85,11 @@ export default function ClaimSheet({ open, onClose }) {
 
               {status.canClaim && status.willCompleteCycle && (
                 <div className="claim-bonus-note">
-                  🎁 Este resgate fecha o ciclo: paga {STREAK_BONUS_MULTIPLIER}x e libera um pacote de figurinha.
+                  Este resgate fecha o ciclo: paga {STREAK_BONUS_MULTIPLIER}x e libera um pacote de figurinha.
                 </div>
               )}
 
-              {shownError && <div className="err-box">⚠️ {shownError}</div>}
+              {shownError && <div className="err-box">{shownError}</div>}
 
               <ClaimButton
                 status={status}

@@ -4,6 +4,7 @@
  * registra no backend e bloqueia múltiplos likes da mesma wallet.
  */
 import { useState, useEffect, useCallback } from 'react';
+import { Heart, Loader2 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { payForLike, getLikePriceSol } from '../lib/likePayment';
 import { safeJson } from '../lib/safeJson';
@@ -95,9 +96,9 @@ export default function LikeButton({ postId, artistWallet, initialCount = 0, wal
           `Curtir por ${getLikePriceSol()} SOL`
         }
       >
-        {loading ? '⏳' : liked ? '❤️' : '🤍'} {count}
+        {loading ? <Loader2 className="lucide spin" /> : liked ? <Heart className="lucide" fill="currentColor" /> : <Heart className="lucide" />} {count}
       </button>
-      {error && <div className="like-error">⚠️ {error}</div>}
+      {error && <div className="like-error">{error}</div>}
       {!liked && !isOwnPost && (
         <span className="like-price">{getLikePriceSol()} SOL</span>
       )}

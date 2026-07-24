@@ -8,6 +8,7 @@
  */
 
 import Head from 'next/head';
+import { Gift, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -43,7 +44,8 @@ export default function AlbumPage() {
       <Head>
         <title>Álbum · Urban Secure</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="theme-color" content="#0a0a0f" />
+        {/* Valor inicial; o ThemeContext o reescreve conforme o tema ativo. */}
+        <meta name="theme-color" content="#0A0B0D" />
       </Head>
 
       <div className="profile-page">
@@ -51,7 +53,7 @@ export default function AlbumPage() {
         <div className="bg-grid" />
 
         <header className="profile-topbar">
-          <button className="btn-ghost" onClick={() => router.push('/')}>← Mapa</button>
+          <button className="btn-ghost" onClick={() => router.push('/')}><ArrowLeft className="lucide" /> Mapa</button>
         </header>
 
         <main className="profile-main">
@@ -66,7 +68,7 @@ export default function AlbumPage() {
               {/* Pacotes a abrir — o que o usuário pode fazer AGORA vem primeiro */}
               {packs > 0 ? (
                 <button className="pack-cta" onClick={() => setPackOpen(true)}>
-                  <span className="pack-cta-icon">🎁</span>
+                  <span className="pack-cta-icon"><Gift className="lucide" /></span>
                   <span className="pack-cta-text">
                     <strong>{packs} {packs === 1 ? 'pacote' : 'pacotes'} para abrir</strong>
                     <span>Toque para abrir</span>
@@ -80,10 +82,10 @@ export default function AlbumPage() {
 
               {feedback && (
                 <div className={feedback.ok ? 'transfer-ok' : 'err-box'}>
-                  {feedback.ok ? '✅' : '⚠️'} {feedback.text}
+                  {feedback.ok ? '' : ''} {feedback.text}
                 </div>
               )}
-              {error && !feedback && <div className="err-box">⚠️ {error}</div>}
+              {error && !feedback && <div className="err-box">{error}</div>}
 
               <AlbumGrid album={album} onPaste={handlePaste} isWorking={isWorking} />
 
@@ -104,7 +106,7 @@ export default function AlbumPage() {
                     ))}
                   </div>
                   <button className="btn-ghost album-trade-cta" onClick={() => setTradeOpen(true)}>
-                    🔄 Abrir trocas
+                    <RefreshCw className="lucide" /> Abrir trocas
                   </button>
                 </>
               )}
