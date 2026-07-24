@@ -6,7 +6,6 @@
  */
 import Link from 'next/link';
 import LikeButton from './LikeButton';
-import CollectButton from './CollectButton';
 import CommentsSection from './CommentsSection';
 import FeedAvatar from './feed/FeedAvatar';
 import { timeAgo } from '../lib/timeAgo';
@@ -85,7 +84,6 @@ export default function ArtFeed({ open, onClose, arts = [], onLocate, isAuthenti
                 <div className="feed-card-body">
                   <div className="feed-actions">
                     <LikeButton postId={art.id} artistWallet={art.artistWallet} isAuthenticated={isAuthenticated} />
-                    <CollectButton art={art} isAuthenticated={isAuthenticated} />
                   </div>
 
                   <p className="feed-desc">

@@ -799,3 +799,16 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .trade-mints{font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trade-actions{display:flex;gap:6px;flex-shrink:0}
 .album-trade-cta{width:100%;justify-content:center;margin-bottom:24px}
+
+/* Seguir */
+.follow-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.follow-btn{padding:9px 18px;border-radius:100px;border:1px solid var(--accent);background:var(--accent);color:#04201C;font-family:'Space Grotesk';font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s}
+.follow-btn:active{transform:scale(.95)}
+/* Ja seguindo vira secundario: a acao em destaque passa a ser outra coisa
+   na tela, e um botao cheio gritando "Seguindo" competiria com ela. */
+.follow-btn.following{background:transparent;color:var(--muted);border-color:var(--border-2)}
+.follow-btn.following:hover{color:var(--danger);border-color:rgba(251,113,133,.45)}
+.follow-btn:disabled{opacity:.55;cursor:default}
+.follow-err{font-size:10.5px;color:var(--danger)}
+.follow-counts{display:flex;gap:16px;margin-bottom:12px;font-size:13px;color:var(--muted)}
+.follow-counts strong{font-family:'Space Grotesk';color:var(--text)}

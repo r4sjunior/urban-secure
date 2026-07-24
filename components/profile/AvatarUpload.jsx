@@ -47,7 +47,12 @@ export default function AvatarUpload({ wallet, handle, avatarUrl, onChange, disa
       localPreview = URL.createObjectURL(cropped);
       setPreview(prev => { if (prev) URL.revokeObjectURL(prev); return localPreview; });
 
-      const url = await uploadFile(cropped);
+      // `uploadFile` devolve { url, mime } — o mime existe pro registro de
+      // arte distinguir foto de vídeo. Aqui só a URL interessa; passar o
+      // objeto inteiro faria `normalizeProfile` descartar o campo por não
+      // ser string, e a foto sumiria sem nenhum erro aparecer.
+      const { url } = await uploadFile(cropped);
+      if (typeof url !== 'string' || !url) throw new Error('Upload não devolveu uma URL válida.');
       onChange(url);
     } catch (err) {
       console.error('[AvatarUpload]', err);

@@ -7,7 +7,7 @@
  * um segundo padrão de modal aqui só faria a interface parecer remendada.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useMyProfile } from '../../context/ProfileContext';
 import { invalidateProfile } from '../../lib/hooks/useProfile';
@@ -29,11 +29,21 @@ export default function ProfileSheet({ open, onClose }) {
   const [draft, setDraft] = useState(null);
   const [feedback, setFeedback] = useState(null); // null | 'ok' | mensagem de erro
 
-  // Semeia o rascunho quando o sheet abre. A dependência em `profile` cobre
-  // o caso de abrir antes do fetch terminar: quando o perfil chega, o
-  // formulário se preenche sozinho.
+  // Marca se o usuário já mexeu no formulário nesta abertura.
+  //
+  // Sem isto, semear o rascunho a cada mudança de `profile` apagava o que
+  // estava sendo digitado: basta o perfil recarregar (o fetch inicial
+  // terminando, ou um refresh após salvar) para o texto do usuário sumir sem
+  // explicação no meio da edição.
+  const touched = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) { touched.current = false; return; }
+
+    // Depois do primeiro toque, o rascunho é do usuário e o servidor não
+    // manda mais nele até a próxima abertura.
+    if (touched.current) return;
+
     setDraft({
       handle: profile?.handle || '',
       bio: profile?.bio || '',
@@ -45,7 +55,11 @@ export default function ProfileSheet({ open, onClose }) {
 
   if (!open || !draft) return null;
 
-  const set = (patch) => { setDraft(d => ({ ...d, ...patch })); setFeedback(null); };
+  const set = (patch) => {
+    touched.current = true;
+    setDraft(d => ({ ...d, ...patch }));
+    setFeedback(null);
+  };
   const bioLeft = BIO_MAX_LENGTH - draft.bio.length;
 
   async function handleSave() {

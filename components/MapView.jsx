@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import LikeButton from './LikeButton';
-import CollectButton from './CollectButton';
 import { googleMapsUrl } from '../lib/googleMaps';
 
 function escapeHtml(str) {
@@ -24,7 +23,6 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const watchRef = useRef(null);
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
-  const collectRootsRef = useRef(new Map()); // postId -> { root, art }
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
   const isAuthRef = useRef(isAuthenticated);
@@ -69,13 +67,10 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   useEffect(() => { walletRef.current = wallet; }, [wallet]);
   useEffect(() => { isAuthRef.current = isAuthenticated; }, [isAuthenticated]);
 
-  // Quando wallet ou auth mudar, re-renderiza LikeButtons/CollectButtons já montados em popups abertos.
+  // Quando wallet ou auth mudar, re-renderiza os LikeButtons já montados em popups abertos.
   useEffect(() => {
     likeRootsRef.current.forEach(({ root, artistWallet, postId }) => {
       root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={wallet} isAuthenticated={isAuthenticated} />);
-    });
-    collectRootsRef.current.forEach(({ root, art }) => {
-      root.render(<CollectButton art={art} wallet={wallet} isAuthenticated={isAuthenticated} />);
     });
   }, [wallet, wallet.connected, wallet.publicKey, isAuthenticated]);
 
@@ -137,8 +132,6 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     const L = require('leaflet');
     likeRootsRef.current.forEach(({ root }) => root.unmount());
     likeRootsRef.current.clear();
-    collectRootsRef.current.forEach(({ root }) => root.unmount());
-    collectRootsRef.current.clear();
     clusterGroupRef.current.clearLayers();
     markersByIdRef.current.clear();
 
@@ -181,7 +174,6 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
         <span>${safeDesc}</span>
         <div class="art-popup-actions">
           <div class="art-popup-like" data-post-id="${escapeHtml(art.id)}" data-artist-wallet="${escapeHtml(art.artistWallet)}"></div>
-          <div class="art-popup-collect" data-post-id="${escapeHtml(art.id)}"></div>
         </div>
         ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" rel="noreferrer" class="art-popup-link art-popup-maps">🧭 Como chegar</a>` : ''}
         <a href="${solscanUrl}" target="_blank" rel="noreferrer" class="art-popup-link">🔗 Ver no Solscan</a>
@@ -218,18 +210,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
           root.render(<LikeButton postId={postId} artistWallet={artistWallet} wallet={walletRef.current} isAuthenticated={isAuthRef.current} />);
         }
       }
-
-      const collectContainer = el?.querySelector('.art-popup-collect');
-      if (collectContainer) {
-        const postId = collectContainer.getAttribute('data-post-id');
-        const art = postId ? markersByIdRef.current.get(postId)?.art : null;
-        if (postId && art) {
-          const root = createRoot(collectContainer);
-          collectRootsRef.current.set(postId, { root, art });
-          root.render(<CollectButton art={art} wallet={walletRef.current} isAuthenticated={isAuthRef.current} />);
-        }
-      }
     });
+
     mapRef.current.on('popupclose', (e) => {
       onPopupToggleRef.current?.(false);
       const el = e.popup?.getElement();
@@ -242,13 +224,6 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
         likeRootsRef.current.delete(postId);
       }
 
-      const collectContainer = el?.querySelector('.art-popup-collect');
-      const collectPostId = collectContainer?.getAttribute('data-post-id');
-      if (collectPostId && collectRootsRef.current.has(collectPostId)) {
-        const { root } = collectRootsRef.current.get(collectPostId);
-        setTimeout(() => root.unmount(), 0);
-        collectRootsRef.current.delete(collectPostId);
-      }
     });
   }, [arts]);
 

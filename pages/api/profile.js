@@ -5,7 +5,7 @@
  *
  * O POST exige assinatura ed25519 da carteira sobre o CONTEÚDO do perfil
  * (ver lib/social/profileSignature.js) — é o que impede alguém de reescrever
- * o perfil alheio via curl. Mesmo padrão de /api/registry e /api/offers.
+ * o perfil alheio via curl. Mesmo padrão de /api/registry e /api/follow.
  */
 
 import nacl from 'tweetnacl';

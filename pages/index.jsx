@@ -22,7 +22,6 @@ const MapView      = dynamic(() => import('../components/MapView'),      { ssr: 
 const MintOverlay  = dynamic(() => import('../components/MintOverlay'),  { ssr: false });
 const WalletHandler= dynamic(() => import('../components/WalletHandler'),{ ssr: false, loading: () => <div className="wallet-skeleton" /> });
 const TransferModal= dynamic(() => import('../components/TransferModal'),{ ssr: false });
-const MarketModal  = dynamic(() => import('../components/MarketModal'),  { ssr: false });
 const ProfileSheet = dynamic(() => import('../components/profile/ProfileSheet'), { ssr: false });
 const ClaimSheet   = dynamic(() => import('../components/claim/ClaimSheet'),     { ssr: false });
 const CameraCapture= dynamic(() => import('../components/capture/CameraCapture'),{ ssr: false });
@@ -105,7 +104,6 @@ export default function Home() {
   const [booting, setBooting] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
-  const [marketOpen, setMarketOpen] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -272,9 +270,6 @@ export default function Home() {
             <button className="feed-toggle" onClick={() => { sound.play('click'); setLeaderboardOpen(true); }} title="Mais curtidas" aria-label="Mais curtidas">
               ❤️
             </button>
-            <button className="feed-toggle" onClick={() => { sound.play('click'); setMarketOpen(true); }} title="Mercado" aria-label="Mercado">
-              🛒
-            </button>
             <Link href="/album" className="feed-toggle" title="Álbum de figurinhas" aria-label="Álbum">
               🃏
             </Link>
@@ -346,9 +341,6 @@ export default function Home() {
 
         {/* Modal de transferência */}
         <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
-
-        {/* Mercado de revenda — comprar/vender artes já mintadas ou coletadas */}
-        <MarketModal open={marketOpen} onClose={() => setMarketOpen(false)} isAuthenticated={isAuthenticated} />
 
         {/* Feed estilo Instagram com as últimas artes registradas */}
         <ArtFeed open={feedOpen} onClose={() => setFeedOpen(false)} arts={arts} onLocate={handleFeedLocate} isAuthenticated={isAuthenticated} />

@@ -1,22 +1,28 @@
 /**
  * components/profile/ProfileCard.jsx
- * Cabeçalho de perfil em modo leitura: avatar, nome, bio, redes e stats.
+ * Cabeçalho de perfil em modo leitura: avatar, nome, bio, redes, seguidores
+ * e estatísticas.
  *
  * Serve tanto o perfil de terceiro (pages/perfil/[wallet].jsx) quanto o
- * próprio — quando é o próprio, ganha o botão de editar em vez de um botão
- * de ação social. Um componente só evita que as duas telas divirjam com o
- * tempo.
+ * próprio — quando é o próprio, ganha o botão de editar; quando é de outro,
+ * ganha o de seguir. Um componente só evita que as duas telas divirjam.
  */
 
 import { displayName, shortWallet } from '../../lib/social/profile';
+import { useFollow } from '../../lib/hooks/useFollow';
 import Avatar from './Avatar';
 import SocialLinks from './SocialLinks';
 import StatsGrid from './StatsGrid';
+import FollowButton from './FollowButton';
 
 export default function ProfileCard({ profile, stats, wallet, isLoading, isSelf, onEdit }) {
   const address = profile?.wallet || wallet || '';
   const name = displayName(profile, address);
   const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
+
+  // Uma leitura só, aqui em cima: os contadores aparecem em todo perfil,
+  // inclusive no próprio, onde o botão de seguir não é renderizado.
+  const follow = useFollow(address);
 
   return (
     <section className="profile-card">
@@ -37,12 +43,24 @@ export default function ProfileCard({ profile, stats, wallet, isLoading, isSelf,
           </a>
         </div>
 
-        {isSelf && (
+        {isSelf ? (
           <button className="btn-ghost profile-card-edit" onClick={onEdit}>
             ✏️ Editar
           </button>
+        ) : (
+          <FollowButton follow={follow} />
         )}
       </div>
+
+      {follow.followers !== null && (
+        <div className="follow-counts">
+          <span>
+            <strong>{follow.followers}</strong>{' '}
+            {follow.followers === 1 ? 'seguidor' : 'seguidores'}
+          </span>
+          <span><strong>{follow.following ?? 0}</strong> seguindo</span>
+        </div>
+      )}
 
       {profile?.bio && <p className="profile-card-bio">{profile.bio}</p>}
 
