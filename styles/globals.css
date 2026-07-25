@@ -1694,3 +1694,10 @@ a.icon-btn, a.feed-toggle { text-decoration: none; }
   .welcome-card { flex-wrap: wrap; }
   .welcome-btn { width: 100%; margin-top: var(--sp-1); }
 }
+
+/* Nota da reconciliação — quando o resgate passou mas a resposta não chegou */
+.claim-result-hint {
+  font-size: 11.5px; color: var(--muted); line-height: 1.5;
+  margin-bottom: 14px; padding: 8px 12px;
+  border-radius: var(--r-sm); background: var(--glass-soft);
+}

@@ -31,6 +31,14 @@ import { evaluateClaim, emptyClaimState, applyClaim, reserveClaim } from '../../
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
 import { hasRegisteredArt } from '../../lib/social/hasRegisteredArt';
 import { getTreasuryBalance, transferFromTreasury } from '../../lib/treasury';
+/**
+ * A Vercel corta funções em 10s por padrão. Esta rota espera a confirmação
+ * de uma transação na Solana, o que pode passar disso — e o corte acontece
+ * DEPOIS de o SOL já ter saído: o usuário vê erro, mas foi pago. Pior, a
+ * resposta cortada vem em HTML, e o cliente quebra ao tentar lê-la como JSON.
+ */
+export const config = { maxDuration: 60 };
+
 import {
   LAMPORTS_PER_SOL,
   DAILY_TREASURY_BUDGET_SOL,

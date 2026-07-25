@@ -21,6 +21,13 @@ import { buildAlbum, packsAvailable } from '../../lib/stickers/album';
 import { pickArt, albumNumberOf, rollRarity } from '../../lib/stickers/rarity';
 import { mintSticker } from '../../lib/stickers/mintSticker';
 import { buildStickerActionMessage } from '../../lib/stickers/stickerSignature';
+/**
+ * A Vercel corta funções em 10s por padrão. Esta rota espera a confirmação
+ * de uma transação na Solana, o que pode passar disso — e o corte acontece
+ * DEPOIS de o SOL já ter saído: o usuário vê erro, mas foi pago. Pior, a
+ * resposta cortada vem em HTML, e o cliente quebra ao tentar lê-la como JSON.
+ */
+export const config = { maxDuration: 60 };
 
 const SIGNATURE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT = 10;

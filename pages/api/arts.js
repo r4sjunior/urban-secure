@@ -7,21 +7,15 @@
  */
 
 import { isUrbanAsset, normalizeDasAsset } from '../../lib/solana/standard';
+import { getLatestPin } from '../../lib/pinataStore';
 
 const REGISTRY_NAME = 'urban-secure-registry-v1';
 
 async function getRegistry(jwt) {
+  // Usa lib/pinataStore, que corre entre vários gateways IPFS. A leitura
+  // direta pelo gateway do Pinata levava ~3,8s e atrasava o mapa inteiro.
   try {
-    const r = await fetch(
-      `https://api.pinata.cloud/data/pinList?status=pinned&metadata[name]=${REGISTRY_NAME}&pageLimit=1&sortBy=date_pinned&sortOrder=DESC`,
-      { headers: { Authorization: `Bearer ${jwt}` } }
-    );
-    if (!r.ok) return [];
-    const data = await r.json();
-    const row = data?.rows?.[0];
-    if (!row) return [];
-    const g = await fetch(`https://gateway.pinata.cloud/ipfs/${row.ipfs_pin_hash}`);
-    const arts = await g.json();
+    const arts = await getLatestPin(jwt, REGISTRY_NAME, []);
     return Array.isArray(arts) ? arts : [];
   } catch { return []; }
 }

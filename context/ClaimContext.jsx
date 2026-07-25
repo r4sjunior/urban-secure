@@ -140,9 +140,43 @@ export function ClaimProvider({ children }) {
       return { ok: true, completedCycle: json.completedCycle };
     } catch (err) {
       const raw = err?.message || 'Erro ao resgatar.';
-      const msg = /rejected|User rejected|cancel/i.test(raw)
-        ? 'Autorização cancelada.'
-        : raw;
+      const cancelou = /rejected|User rejected|cancel/i.test(raw);
+
+      if (cancelou) {
+        setError('Autorização cancelada.');
+        return { ok: false, error: 'Autorização cancelada.' };
+      }
+
+      // A resposta não chegou — mas o resgate pode ter acontecido.
+      //
+      // O servidor transfere o SOL e grava o estado ANTES de responder. Se a
+      // conexão cair, ou a função exceder o tempo, o dinheiro saiu e o
+      // usuário vê "erro" — foi exatamente o que aconteceu: o claim
+      // contabilizou e a tela acusou falha, exigindo F5.
+      //
+      // Consultar o estado real resolve a ambiguidade: se o cooldown já está
+      // valendo, o resgate deu certo e dizemos isso.
+      try {
+        const res = await fetch(`/api/claim?wallet=${encodeURIComponent(address)}`);
+        const json = await res.json();
+
+        if (res.ok && json.status && !json.status.canClaim) {
+          setStatus(json.status);
+          setError(null);
+          setLastResult({
+            // Sem os detalhes da transação — só sabemos que passou.
+            signature: null,
+            amountSol: json.status.amountSol,
+            streak: json.status.currentStreak,
+            completedCycle: false,
+            packAvailable: false,
+            reconciliado: true,
+          });
+          return { ok: true, reconciliado: true };
+        }
+      } catch { /* a consulta também falhou; segue para o erro normal */ }
+
+      const msg = 'A conexão falhou durante o resgate. Puxe a tela para atualizar e confira seu streak.';
       setError(msg);
       return { ok: false, error: msg };
     } finally {

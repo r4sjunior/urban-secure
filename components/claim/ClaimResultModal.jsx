@@ -2,16 +2,30 @@
  * components/claim/ClaimResultModal.jsx
  * Confirmação do claim, com link pro explorer.
  *
- * O link não é enfeite: o app promete que o SOL vem de uma carteira real na
- * devnet, e a assinatura é a prova disso. Poder conferir na hora é o que
- * separa "o app disse que pagou" de "a chain mostra que pagou".
+ * TOLERANTE A CAMPOS AUSENTES por decisão, não por descuido. Este componente
+ * roda logo após uma transação; se a resposta vier incompleta — conexão que
+ * caiu, função que excedeu o tempo, reconciliação que sabe que o resgate
+ * passou mas não tem a assinatura — um `undefined.toFixed()` derrubaria a
+ * aplicação inteira com "client-side exception", logo depois de o usuário ter
+ * recebido o SOL. A tela de sucesso não pode ser mais frágil que a operação
+ * que ela celebra.
  */
+
+import { Gift, Zap, Flame } from 'lucide-react';
 
 export default function ClaimResultModal({ result, onDismiss }) {
   if (!result) return null;
 
   const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
-  const explorerUrl = `https://explorer.solana.com/tx/${result.signature}?cluster=${network}`;
+
+  // A assinatura falta quando o resultado veio da reconciliação: sabemos que
+  // o resgate aconteceu, mas não qual foi a transação.
+  const explorerUrl = result.signature
+    ? `https://explorer.solana.com/tx/${result.signature}?cluster=${network}`
+    : null;
+
+  const valor = Number.isFinite(result.amountSol) ? result.amountSol.toFixed(4) : null;
+  const streak = Number.isFinite(result.streak) ? result.streak : null;
 
   return (
     <div className="claim-result" onClick={onDismiss}>
@@ -24,11 +38,13 @@ export default function ClaimResultModal({ result, onDismiss }) {
           {result.completedCycle ? 'Ciclo completo!' : 'Resgate confirmado'}
         </h3>
 
-        <p className="claim-result-amount">+{result.amountSol.toFixed(4)} SOL</p>
+        {valor && <p className="claim-result-amount">+{valor} SOL</p>}
 
-        <p className="claim-result-streak">
-          <Flame className="lucide" /> {result.streak} {result.streak === 1 ? 'dia seguido' : 'dias seguidos'}
-        </p>
+        {streak !== null && (
+          <p className="claim-result-streak">
+            <Flame className="lucide" /> {streak} {streak === 1 ? 'dia seguido' : 'dias seguidos'}
+          </p>
+        )}
 
         {result.packAvailable && (
           <div className="claim-result-pack">
@@ -36,14 +52,24 @@ export default function ClaimResultModal({ result, onDismiss }) {
           </div>
         )}
 
-        <a
-          className="claim-result-link"
-          href={explorerUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Ver transação no explorer ↗
-        </a>
+        {/* Quando o resultado veio da reconciliação, é honesto dizer que o
+            resgate passou mesmo sem termos o comprovante em mãos. */}
+        {result.reconciliado && (
+          <p className="claim-result-hint">
+            A conexão oscilou, mas seu resgate foi registrado.
+          </p>
+        )}
+
+        {explorerUrl && (
+          <a
+            className="claim-result-link"
+            href={explorerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Ver transação no explorer ↗
+          </a>
+        )}
 
         <button className="mint-cta" onClick={onDismiss}>Fechar</button>
       </div>
