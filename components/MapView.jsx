@@ -26,6 +26,18 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const markerRef = useRef(null);
   const markersByIdRef = useRef(new Map()); // art.id -> { marker, art }
   const [lightbox, setLightbox] = useState(null); // url da imagem ampliada
+
+  // O mapa já existe? Precisa ser ESTADO, não só o ref.
+  //
+  // O rastreio de GPS vive no GeoProvider, que monta antes do mapa — e com
+  // `maximumAge` o sistema costuma devolver a primeira posição na hora, do
+  // cache. Ou seja: a posição normalmente chega ANTES do Leaflet terminar de
+  // carregar. Mutar `mapRef.current` não re-renderiza nada, então o efeito
+  // que desenha a posição saía pelo `return` e nunca era reexecutado: o
+  // usuário ficava sem o ponto azul e sem coordenada para registrar arte,
+  // até o watch emitir uma leitura nova — o que, com o aparelho parado, pode
+  // demorar muito ou não acontecer.
+  const [mapaPronto, setMapaPronto] = useState(false);
   const circleRef = useRef(null);
   const clusterGroupRef = useRef(null);
   const activeRef = useRef(false);
@@ -110,6 +122,8 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     mapRef.current = map;
     activeRef.current = true;
+    // Avisa o efeito da posição de que já dá para desenhar (ver `mapaPronto`).
+    setMapaPronto(true);
 
     // O CARTO publica variantes clara e escura do mesmo mapa. Trocar a
     // CAMADA é muito melhor que inverter a escura por filtro CSS: o invert
@@ -144,6 +158,10 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       if (clusterGroupRef.current) clusterGroupRef.current.clearLayers();
       map.remove();
       mapRef.current = markerRef.current = circleRef.current = clusterGroupRef.current = null;
+      setMapaPronto(false);
+      // O próximo mapa precisa centralizar no primeiro fix de novo — senão,
+      // ao voltar do álbum, ele nasce em Natal e ignora onde o usuário está.
+      firstFix.current = true;
     };
   }, []);
 
@@ -281,10 +299,10 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
    * Desenha a posição do usuário. Roda quando o contexto reporta algo novo.
    */
   useEffect(() => {
-    if (!posicao || posicao.error || !mapRef.current) {
-      if (posicao?.error) onLocationUpdate({ error: posicao.error });
-      return;
-    }
+    // O erro é reportado mesmo sem mapa: a barra de status precisa dizer
+    // "permissão negada" antes de o Leaflet terminar de carregar.
+    if (posicao?.error) { onLocationUpdate({ error: posicao.error }); return; }
+    if (!posicao || !mapaPronto || !mapRef.current) return;
 
     const L = require('leaflet');
     const m = mapRef.current;
@@ -314,7 +332,7 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     } catch {}
 
     onLocationUpdate({ lat, lng, acc, fonte: 'GPS' });
-  }, [posicao, onLocationUpdate]);
+  }, [posicao, onLocationUpdate, mapaPronto]);
 
   /**
    * Leva o mapa até a posição do usuário.
