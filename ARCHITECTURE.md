@@ -517,7 +517,7 @@ Camadas implementadas (parâmetros em `lib/config.js`):
 
 | Camada | Parâmetro | O que impede |
 |---|---|---|
-| Teto diário global | `DAILY_TREASURY_BUDGET_SOL = 2` | Drenagem completa — o pior caso vira 2 SOL/dia |
+| Teto diário global | `DAILY_TREASURY_BUDGET_SOL = 5` (boas-vindas) + `daily_budget = 5 SOL` na conta do programa (claim diário) | Drenagem completa — o pior caso vira 5 SOL/dia por trilha |
 | Reserva mínima | `TREASURY_RESERVE_SOL = 0.5` | Faucet comer o dinheiro dos prêmios |
 | Exigir 1 arte antes do 1º claim | `REQUIRE_ART_BEFORE_FIRST_CLAIM` | Inverte a economia do sybil: o atacante paga o mint antes de receber |
 | Rate limit por IP | `/api/claim` | Automação trivial |
@@ -796,7 +796,7 @@ O alerta em `programs/DEPLOY.md § 4` documenta a armadilha e como conferir.
 | | |
 |---|---|
 | Program Id | `HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy` |
-| Cofre (PDA `["treasury"]`) | `57BvNuavWnLQF5wc3DBQsRNeQoNvJAyd13qvxfJ3jF7U` — 2 SOL, teto diário 2 SOL |
+| Cofre (PDA `["treasury"]`) | `57BvNuavWnLQF5wc3DBQsRNeQoNvJAyd13qvxfJ3jF7U` — ~11 SOL, teto diário 5 SOL |
 | Authority do cofre | a treasury (`5arzYD6i…`), que assina `pay_weekly_prize` |
 | Keypair da treasury | 5,43 SOL — continua pagando o claim de boas-vindas e o mint das figurinhas |
 
@@ -808,3 +808,19 @@ Verificado de ponta a ponta na devnet: `claim_daily` pagou 0,0105 SOL, criou o
 `ClaimState` com streak 1, e a segunda tentativa imediata foi recusada com
 `ClaimOnCooldown`. O `GET /api/claim` devolve `onChain: true` para quem tem
 conta e o histórico antigo em `legacy` para quem não tem.
+
+### Em produção
+
+Publicado em **https://urban-secure.vercel.app** (2026-07-25), apontando para a
+mesma devnet. `NEXT_PUBLIC_URBAN_PROGRAM_ID` foi adicionada às variáveis de
+produção — sem ela o app cairia no `address` do IDL, que hoje coincide, mas
+depender disso é acidente esperando para acontecer no próximo redeploy.
+
+**Testar exige HTTPS.** A captura por câmera usa `getUserMedia`, que só roda em
+contexto seguro: `localhost` é exceção, IP de rede local **não é**. Passar
+`http://192.168.x.x:3000` para alguém testar faz o app abrir e o registro de
+arte falhar — e como não existe fallback de upload de arquivo (§ 4), a pessoa
+trava. Convidados precisam do domínio da Vercel.
+
+O outro atrito é a carteira: cada pessoa precisa da Phantom **trocada para
+devnet**, o que não dá para automatizar pelo app.
