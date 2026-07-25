@@ -9,6 +9,7 @@ import { useMyProfile } from '../context/ProfileContext';
 import { SprayCan, Flame, Menu, Search, X, Plus, Send } from 'lucide-react';
 import UpdatesTicker from '../components/shell/UpdatesTicker';
 import { jaViuOnboarding } from '../components/shell/Onboarding';
+import { devePularSplash } from '../components/shell/SplashScreen';
 import { useClaim } from '../context/ClaimContext';
 import Avatar from '../components/profile/Avatar';
 import { resizeImage } from '../lib/resizeImage';
@@ -105,6 +106,9 @@ export default function Home() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [gps, setGps] = useState(null);
   const [busca, setBusca] = useState('');
+  // Começa em `true` e o efeito abaixo decide: ler localStorage no
+  // inicializador do estado divergiria entre servidor e cliente e quebraria
+  // a hidratação.
   const [booting, setBooting] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -121,6 +125,11 @@ export default function Home() {
   const [mintStep, setMintStep] = useState(null);
   const [mintError, setMintError] = useState(null);
   const [mintResult, setMintResult] = useState(null);
+
+  // Quem já viu a abertura nas últimas 12h vai direto ao mapa.
+  useEffect(() => {
+    if (devePularSplash()) setBooting(false);
+  }, []);
 
   const handleLocationUpdate = useCallback(d => setGps(d), []);
 

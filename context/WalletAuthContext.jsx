@@ -2,12 +2,28 @@
  * context/WalletAuthContext.jsx
  * Autenticação via assinatura de mensagem — prova de posse da carteira.
  * Não gera transação on-chain; usa wallet.signMessage() do Phantom.
- * Auth é armazenada em sessionStorage (expira ao fechar a aba).
+ * A autorização vale 7 dias e fica em localStorage — ver SESSION_TTL_MS.
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 const SESSION_KEY = 'urban-secure:auth';
+
+/**
+ * A sessão vale 7 dias, em localStorage.
+ *
+ * Antes era `sessionStorage`, que morre ao fechar a aba. No celular isso é
+ * constante: o sistema descarta a aba em segundo plano, o usuário volta ao
+ * app e precisa assinar de novo — várias vezes por dia. O atrito era grande
+ * o bastante para atrapalhar o uso normal.
+ *
+ * O que a assinatura prova é posse da carteira, e isso não muda em 7 dias.
+ * O que realmente move valor (registrar arte, claim, troca) continua exigindo
+ * assinatura da carteira na hora, com o Phantom pedindo confirmação — então
+ * persistir esta sessão não dá a ninguém um poder que ela já não tivesse com
+ * o aparelho desbloqueado na mão.
+ */
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function buildMessage(pubkey) {
   // Nonce criptográfico aleatório — impede replay de assinaturas antigas
@@ -39,13 +55,24 @@ export function WalletAuthProvider({ children }) {
     }
   }, [wallet.connected, wallet.publicKey]);
 
-  // Restaura sessão do sessionStorage ao conectar
+  // Restaura a sessão ao conectar, se ainda estiver dentro da validade.
   useEffect(() => {
     if (!wallet.publicKey) return;
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) return;
-      const { wallet: saved } = JSON.parse(raw);
+
+      const { wallet: saved, ts } = JSON.parse(raw);
+
+      // Sessão vencida é descartada aqui mesmo, para não ficar acumulando
+      // registro morto no armazenamento do navegador.
+      if (!ts || Date.now() - ts > SESSION_TTL_MS) {
+        localStorage.removeItem(SESSION_KEY);
+        return;
+      }
+
+      // A sessão vale para UMA carteira. Trocar de conta no Phantom precisa
+      // de nova assinatura — senão a autorização de uma valeria para a outra.
       if (saved === wallet.publicKey.toBase58()) setIsAuthenticated(true);
     } catch {}
   }, [wallet.publicKey]);
@@ -74,7 +101,7 @@ export function WalletAuthProvider({ children }) {
 
       setIsAuthenticated(true);
       try {
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
           wallet: wallet.publicKey.toBase58(),
           ts: Date.now(),
         }));
@@ -95,7 +122,7 @@ export function WalletAuthProvider({ children }) {
   const logout = useCallback(async () => {
     setIsAuthenticated(false);
     setAuthError(null);
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
     try { await wallet.disconnect(); } catch (e) { console.error('[WalletAuth] disconnect:', e?.message); }
     try { localStorage.removeItem('urban-secure:wallet'); } catch {}
   }, [wallet]);

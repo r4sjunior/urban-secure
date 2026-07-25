@@ -23,10 +23,38 @@ const PILARES = [
 
 const DURACAO_MS = 2600;
 
+const VISTA_KEY = 'urban-secure:splash-vista';
+
+/**
+ * A abertura aparece no máximo uma vez a cada 12 horas.
+ *
+ * Antes ela rodava em TODO carregamento — e no celular a página recarrega o
+ * tempo todo: trocar de app e voltar, girar a tela, o sistema descartar a
+ * aba. O usuário levava 3 segundos de marca antes de chegar ao mapa, várias
+ * vezes por dia, para ver uma apresentação que já conhecia.
+ *
+ * A janela de 12h preserva o que a abertura serve — apresentar a proposta a
+ * quem chega — sem transformá-la em pedágio para quem já usa.
+ */
+export function devePularSplash() {
+  if (typeof window === 'undefined') return false;
+  try {
+    const ts = Number(localStorage.getItem(VISTA_KEY));
+    return Number.isFinite(ts) && Date.now() - ts < 12 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+function marcarVista() {
+  try { localStorage.setItem(VISTA_KEY, String(Date.now())); } catch {}
+}
+
 export default function SplashScreen({ onDone }) {
   const [saindo, setSaindo] = useState(false);
 
   useEffect(() => {
+    marcarVista();
     const fim = setTimeout(() => setSaindo(true), DURACAO_MS);
     // O onDone é disparado depois da transição de saída, senão o conteúdo
     // por baixo aparece com um salto no meio do fade.

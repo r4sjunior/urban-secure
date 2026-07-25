@@ -10,3 +10,7 @@ certificates/
 
 .vercel
 .env*
+
+# Scripts temporarios de teste/diagnostico
+.tmp-test/
+*.local.bak
