@@ -30,6 +30,30 @@ function mergeArts(existing, incoming) {
   return Array.from(map.values());
 }
 
+/**
+ * As duas listas descrevem o mesmo conjunto de artes?
+ *
+ * POR QUE ISTO IMPORTA: o merge sempre devolve um array NOVO, mesmo quando
+ * nada mudou. Como o MapView reage à identidade do array, cada busca em
+ * segundo plano destruía e recriava todos os pinos — e quem estivesse
+ * arrastando o mapa via os marcadores piscarem e sumirem no meio do gesto.
+ *
+ * Compara por id e por timestamp: é o que muda quando uma arte é editada.
+ * Comparar o objeto inteiro seria mais caro e não pegaria nada a mais, já
+ * que o registry é append-only.
+ */
+function mesmasArtes(a, b) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+
+  const porId = new Map(a.map(x => [x.id, x.timestamp]));
+  for (const arte of b) {
+    if (!porId.has(arte.id)) return false;
+    if (porId.get(arte.id) !== arte.timestamp) return false;
+  }
+  return true;
+}
+
 const ArtsContext = createContext(null);
 
 export function ArtsProvider({ children }) {
@@ -79,6 +103,11 @@ export function ArtsProvider({ children }) {
 
       setArts(prev => {
         const merged = mergeArts(prev, data.arts);
+
+        // Mantém a MESMA referência quando o conteúdo não mudou. É o que
+        // impede o mapa de recriar todos os pinos a cada busca de fundo.
+        if (mesmasArtes(prev, merged)) return prev;
+
         writeCache(network, merged);
         console.log(`[ArtsContext] total no mapa: ${merged.length}`);
         return merged;
@@ -97,6 +126,7 @@ export function ArtsProvider({ children }) {
     console.log('[ArtsContext] nova arte adicionada:', art.id);
     setArts(prev => {
       const merged = mergeArts(prev, [art]);
+      if (mesmasArtes(prev, merged)) return prev;
       writeCache(network, merged);
       return merged;
     });

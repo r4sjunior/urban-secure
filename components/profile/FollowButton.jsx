@@ -5,11 +5,11 @@
  * próprio).
  */
 
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, Loader2 } from 'lucide-react';
 import { sound } from '../../lib/sound';
 
 export default function FollowButton({ follow }) {
-  const { isFollowing, busy, error, canFollow, toggle } = follow;
+  const { isFollowing, busy, error, canFollow, carregando, toggle } = follow;
 
   // Sem carteira conectada, ou no próprio perfil, não há o que seguir.
   if (!canFollow) return null;
@@ -19,12 +19,19 @@ export default function FollowButton({ follow }) {
       <button
         className={`follow-btn${isFollowing ? ' following' : ''}`}
         onClick={() => { sound.play('click'); toggle(); }}
-        // `isFollowing === null` é "ainda não sei" — desabilitar evita o
-        // botão aparecer como "+ Seguir" para quem já segue e o clique
-        // desfazer o que a pessoa não quis desfazer.
-        disabled={busy || isFollowing === null}
+        // Bloqueia só enquanto a ação está em curso ou o estado inicial ainda
+        // não chegou. Antes, um `isFollowing` nulo vindo do servidor deixava
+        // o botão desabilitado para sempre — o usuário via "···" e não
+        // conseguia seguir ninguém.
+        disabled={busy || carregando}
       >
-        {isFollowing === null ? '···' : isFollowing ? <><Check className="lucide" /> Seguindo</> : <><Plus className="lucide" /> Seguir</>}
+        {busy
+          ? <><Loader2 className="lucide spin" /> …</>
+          : carregando
+            ? '···'
+            : isFollowing
+              ? <><Check className="lucide" /> Seguindo</>
+              : <><Plus className="lucide" /> Seguir</>}
       </button>
       {error && <span className="follow-err">{error}</span>}
     </div>

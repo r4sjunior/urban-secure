@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletAuth } from '../context/WalletAuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useGeo } from '../context/GeoContext';
 import LikeButton from './LikeButton';
 import { LocateFixed } from 'lucide-react';
 import { googleMapsUrl } from '../lib/googleMaps';
@@ -28,12 +29,12 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   const circleRef = useRef(null);
   const clusterGroupRef = useRef(null);
   const activeRef = useRef(false);
-  const watchRef = useRef(null);
   const firstFix = useRef(true);
   const likeRootsRef = useRef(new Map()); // postId -> { root, artistWallet }
   const wallet = useWallet();
   const { isAuthenticated } = useWalletAuth();
   const { theme } = useTheme();
+  const { posicao, reiniciar: reiniciarGps } = useGeo();
   const tileRef = useRef(null);
   const isAuthRef = useRef(isAuthenticated);
   const onPopupToggleRef = useRef(onPopupToggle);
@@ -135,11 +136,11 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
       },
     }).addTo(map);
 
-    startGPS(L, map, userIcon);
+    // O rastreio é global (context/GeoContext.jsx) — o mapa só desenha o
+    // que ele reporta. Antes o watch vivia aqui e morria a cada navegação.
 
     return () => {
       activeRef.current = false;
-      stopGPS();
       if (clusterGroupRef.current) clusterGroupRef.current.clearLayers();
       map.remove();
       mapRef.current = markerRef.current = circleRef.current = clusterGroupRef.current = null;
@@ -155,15 +156,39 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
   useEffect(() => {
     if (!mapRef.current || !clusterGroupRef.current || typeof window === 'undefined') return;
     const L = require('leaflet');
-    likeRootsRef.current.forEach(({ root }) => root.unmount());
-    likeRootsRef.current.clear();
-    clusterGroupRef.current.clearLayers();
-    markersByIdRef.current.clear();
+
+    // RECONCILIA em vez de recriar.
+    //
+    // Antes, cada mudança em `arts` limpava o cluster inteiro e remontava
+    // todos os pinos. Numa busca de fundo — que acontece ao abrir o app e ao
+    // registrar uma arte — os marcadores sumiam e voltavam, e quem estivesse
+    // arrastando o mapa via tudo piscar no meio do gesto. Um popup aberto
+    // era fechado à força junto.
+    //
+    // Agora só entram os pinos novos e só saem os que deixaram de existir.
+    // Quem já está no mapa fica intacto, com seu popup e sua posição.
+    const idsAtuais = new Set(arts.map(a => a.id).filter(Boolean));
+
+    for (const [id, entry] of markersByIdRef.current) {
+      if (idsAtuais.has(id)) continue;
+      try { clusterGroupRef.current.removeLayer(entry.marker); } catch {}
+      markersByIdRef.current.delete(id);
+
+      const root = likeRootsRef.current.get(id);
+      if (root) {
+        // Desmonte assíncrono: síncrono aqui dispara aviso do React por
+        // desmontar durante o render de outra árvore.
+        setTimeout(() => { try { root.root.unmount(); } catch {} }, 0);
+        likeRootsRef.current.delete(id);
+      }
+    }
 
     const COLORS = ['#FF3D71', '#FFD23F', '#3DFF88'];
     const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
 
     arts.forEach((art, i) => {
+      // Já está no mapa: nada a fazer.
+      if (art.id && markersByIdRef.current.has(art.id)) return;
       const color = COLORS[i % COLORS.length];
       const safeImg = (art.imageUrl||'').startsWith('https://') ? escapeHtml(art.imageUrl) : '';
 
@@ -252,42 +277,62 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
     });
   }, [arts]);
 
-  function stopGPS() {
-    if (watchRef.current !== null) { navigator.geolocation.clearWatch(watchRef.current); watchRef.current = null; }
-  }
-
-  function startGPS(Larg, mapArg, iconArg) {
-    const L = Larg || require('leaflet');
-    const map = mapArg || mapRef.current;
-    const icon = iconArg || L.divIcon({ className:'', html:'<div class="me-marker"><div class="me-dot"></div></div>', iconSize:[24,24], iconAnchor:[12,12] });
-    if (!map || !navigator.geolocation) { onLocationUpdate({ error: 'GPS não disponível.' }); return; }
-    stopGPS();
-
-    function onPos(pos) {
-      if (!activeRef.current || !mapRef.current) return;
-      const m = mapRef.current;
-      const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = Math.round(pos.coords.accuracy);
-      try {
-        if (markerRef.current) markerRef.current.setLatLng([lat,lng]);
-        else markerRef.current = L.marker([lat,lng], { icon }).addTo(m);
-        if (circleRef.current) circleRef.current.setLatLng([lat,lng]).setRadius(acc);
-        else circleRef.current = L.circle([lat,lng], { radius:acc, color:'#3DFF88', fillColor:'#3DFF88', fillOpacity:0.08, weight:1 }).addTo(m);
-        if (firstFix.current) { m.setView([lat,lng], 17); firstFix.current = false; }
-      } catch {}
-      onLocationUpdate({ lat, lng, acc, fonte:'GPS' });
+  /**
+   * Desenha a posição do usuário. Roda quando o contexto reporta algo novo.
+   */
+  useEffect(() => {
+    if (!posicao || posicao.error || !mapRef.current) {
+      if (posicao?.error) onLocationUpdate({ error: posicao.error });
+      return;
     }
-    function onErr(err) {
-      if (!activeRef.current) return;
-      if (err.code === 3) {
-        watchRef.current = navigator.geolocation.watchPosition(onPos,
-          () => onLocationUpdate({ error:'GPS indisponível.' }),
-          { enableHighAccuracy:false, maximumAge:10000, timeout:30000 });
-        return;
+
+    const L = require('leaflet');
+    const m = mapRef.current;
+    const { lat, lng, acc } = posicao;
+
+    try {
+      if (markerRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+      } else {
+        const icon = L.divIcon({
+          className: '',
+          html: '<div class="me-marker"><div class="me-pulse"></div><div class="me-dot"></div></div>',
+          iconSize: [24, 24], iconAnchor: [12, 12],
+        });
+        markerRef.current = L.marker([lat, lng], { icon }).addTo(m);
       }
-      onLocationUpdate({ error: err.code===1 ? 'Permissão de GPS negada.' : 'GPS indisponível.' });
+
+      if (circleRef.current) circleRef.current.setLatLng([lat, lng]).setRadius(acc);
+      else circleRef.current = L.circle([lat, lng], {
+        radius: acc, color: '#3DFF88', fillColor: '#3DFF88', fillOpacity: 0.08, weight: 1,
+      }).addTo(m);
+
+      // Só centraliza no PRIMEIRO fix. Depois disso o mapa é do usuário —
+      // recentralizar a cada atualização puxaria a tela de volta enquanto
+      // ele navega, que é exatamente o tipo de falha que ele relatou.
+      if (firstFix.current) { m.setView([lat, lng], 17); firstFix.current = false; }
+    } catch {}
+
+    onLocationUpdate({ lat, lng, acc, fonte: 'GPS' });
+  }, [posicao, onLocationUpdate]);
+
+  /**
+   * Leva o mapa até a posição do usuário.
+   *
+   * Não reinicia o rastreio — só move a câmera. Reiniciar reacenderia o
+   * sensor e traria de volta o "pedindo GPS toda hora". Se ainda não houver
+   * posição, aí sim pede uma releitura ao contexto.
+   */
+  const centralizarNoUsuario = useCallback(() => {
+    const m = mapRef.current;
+    if (!m) return;
+
+    if (markerRef.current) {
+      m.setView(markerRef.current.getLatLng(), Math.max(m.getZoom(), 16), { animate: true });
+      return;
     }
-    watchRef.current = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy:true, maximumAge:0, timeout:30000 });
-  }
+    reiniciarGps();
+  }, [reiniciarGps]);
 
   return (
     <div style={{ width:'100%', height:'100%', position:'relative' }}>
@@ -301,7 +346,7 @@ const MapView = forwardRef(function MapView({ onLocationUpdate, arts = [], isLoa
           <span>Carregando artes…</span>
         </div>
       )}
-      <button className="gps-fab" onClick={() => startGPS()} title="Centralizar no meu GPS" aria-label="Centralizar no meu GPS">
+      <button className="gps-fab" onClick={centralizarNoUsuario} title="Centralizar no meu GPS" aria-label="Centralizar no meu GPS">
         <LocateFixed className="lucide" />
       </button>
 

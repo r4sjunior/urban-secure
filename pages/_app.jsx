@@ -8,23 +8,27 @@ import { WalletAuthProvider } from '../context/WalletAuthContext';
 import { ProfileProvider } from '../context/ProfileContext';
 import { ClaimProvider } from '../context/ClaimContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { GeoProvider } from '../context/GeoContext';
 
 import '@solana/wallet-adapter-react-ui/styles.css';
 import '../styles/globals.css';
 
 /**
- * `autoConnect` fica DESLIGADO de propósito.
+ * `autoConnect` LIGADO — revertendo uma tentativa anterior de desligá-lo.
  *
- * Com ele ativo, a Phantom já autorizada reconecta sozinha ao abrir o app:
- * perfil, streak e avatar apareciam sem o usuário ter tocado em "conectar" —
- * exatamente o comportamento que parece um bug ("meu perfil aparece antes de
- * eu conectar"). Numa rede social é também privacidade: quem pega o celular
- * de outra pessoa não deveria ver a identidade dela só por abrir o app.
+ * Eu o desliguei para resolver "meu perfil aparece antes de eu conectar", e
+ * a cura foi pior que a doença: sem reconexão automática, a carteira caía a
+ * cada recarregamento, e o usuário tinha que conectar E ASSINAR de novo toda
+ * vez que voltava uma tela. Trocar um incômodo cosmético por atrito
+ * constante numa ação que envolve carteira é um mau negócio.
  *
- * Custo: o usuário recorrente toca em "conectar" uma vez por sessão. Como a
- * carteira já está autorizada, é um clique sem popup.
+ * O adaptador só reconecta quem JÁ autorizou este site antes — não há
+ * conexão silenciosa de carteira desconhecida. Junto com a sessão de 7 dias
+ * (context/WalletAuthContext.jsx), o usuário recorrente entra sem assinar.
+ *
+ * Quem quiser sair de verdade usa "Sair", que limpa a sessão e desconecta.
  */
-const AUTO_CONNECT = false;
+const AUTO_CONNECT = true;
 
 function Providers({ children }) {
   const network = process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet';
@@ -33,6 +37,10 @@ function Providers({ children }) {
 
   return (
     <ThemeProvider>
+      {/* GeoProvider por fora de tudo: o rastreio de posição não depende de
+          carteira nem de dados, e precisa sobreviver à navegação entre telas
+          — era o que fazia o app repedir GPS a cada ida e volta. */}
+      <GeoProvider>
       <ConnectionProvider endpoint={endpoint}>
         <WalletProvider
           wallets={wallets}
@@ -58,6 +66,7 @@ function Providers({ children }) {
           </WalletModalProvider>
         </WalletProvider>
       </ConnectionProvider>
+      </GeoProvider>
     </ThemeProvider>
   );
 }

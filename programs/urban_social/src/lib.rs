@@ -579,7 +579,11 @@ pub struct PayWeeklyPrize<'info> {
         init,
         payer = authority,
         space = WeeklyPayout::SPACE,
-        seeds = [b"payout", &week_id.to_le_bytes(), &[position]],
+        // `.as_ref()` em todos os seeds: sem isso o compilador tenta unificar
+        // os tipos dos elementos e reclama que `b"payout"` (6 bytes) e o
+        // `to_le_bytes()` de um u32 (4 bytes) são arrays de tamanhos
+        // diferentes. Como slices, todos viram `&[u8]`.
+        seeds = [b"payout".as_ref(), week_id.to_le_bytes().as_ref(), &[position]],
         bump
     )]
     pub payout: Account<'info, WeeklyPayout>,

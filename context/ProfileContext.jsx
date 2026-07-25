@@ -8,6 +8,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { fetchJson } from '../lib/fetchJson';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { defaultProfile, normalizeProfile } from '../lib/social/profile';
 import { buildProfileMessage, hashProfileContent } from '../lib/social/profileSignature';
@@ -52,12 +53,11 @@ export function ProfileProvider({ children }) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/profile?wallet=${encodeURIComponent(target)}`);
-      const json = await res.json();
+      const { ok, data: json, error: erroHttp } = await fetchJson(`/api/profile?wallet=${encodeURIComponent(target)}`);
 
       if (requestedFor.current !== target) return; // carteira mudou no meio
 
-      if (!res.ok) throw new Error(json.error || 'Erro ao carregar perfil.');
+      if (!ok) throw new Error(json.error || erroHttp || 'Erro ao carregar perfil.');
 
       setProfile(json.profile || defaultProfile(target));
       setStats(json.stats || EMPTY_STATS);
@@ -101,13 +101,12 @@ export function ProfileProvider({ children }) {
       const sigBytes = await wallet.signMessage(new TextEncoder().encode(message));
       const signature = Buffer.from(sigBytes).toString('base64');
 
-      const res = await fetch('/api/profile', {
+      const { ok, data: json, error: erroHttp } = await fetchJson('/api/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...normalized, timestamp, signature }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erro ao salvar.');
+      if (!ok) throw new Error(json.error || erroHttp || 'Erro ao salvar.');
 
       setProfile(json.profile);
       return { ok: true };
