@@ -14,3 +14,12 @@ certificates/
 # Scripts temporarios de teste/diagnostico
 .tmp-test/
 *.local.bak
+
+# Build do programa Anchor. `cargo-build-sbf` gera 326 MB aqui (dependências
+# compiladas + o .so). Nada disso pertence ao repositório: o binário é
+# reproduzível a partir do fonte, e quem clona não deve baixar isso.
+#
+# O Cargo.lock, ao contrário, É versionado de propósito — sem ele, um rebuild
+# meses depois pega versões diferentes de anchor-lang e pode gerar um binário
+# que não corresponde ao que foi auditado.
+programs/**/target/

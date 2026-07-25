@@ -725,7 +725,7 @@ treasury usa a versão estrita. Leitura que só preenche tela usa a tolerante.
   que não existe ainda.
 ---
 
-## 10. Fase 2 — integração com o programa `urban_social` ✅ (código) / ⏳ (deploy)
+## 10. Fase 2 — integração com o programa `urban_social` ✅
 
 O programa foi escrito, deployado na devnet e **integrado ao app**. A camada de
 acesso não usa `@coral-xyz/anchor`: o cliente oficial arrasta ~500 kB e uma
@@ -779,18 +779,32 @@ fraqueza que a migração veio remover. O pin `CLAIMS` **não foi apagado**: seg
 exposto em `legacy` no `GET /api/claim`, só para exibição, e a `ClaimSheet`
 avisa que o histórico continua guardado.
 
-### ⏳ Pendente: o programa no ar precisa de upgrade
+### O incidente do `declare_id` — resolvido em 2026-07-25
 
-O binário deployado em `HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy` foi
-compilado com o `declare_id!` **placeholder**, então o Anchor recusa toda
-instrução com `DeclaredProgramIdMismatch` (0x1004). Verificado lendo o ELF da
-conta de programdata: os 32 bytes de `Fg6PaFpo…` estão lá; os de `HyPVy5NL…`
-não.
+O primeiro deploy subiu o binário compilado com o `declare_id!` **placeholder**
+(`Fg6PaFpo…`), então o Anchor recusava TODA instrução com
+`DeclaredProgramIdMismatch` (0x1004) — o programa aparecia executável no
+explorer e mesmo assim não fazia nada. Diagnosticado lendo o ELF da conta de
+programdata e procurando os 32 bytes do id.
 
-Consequências enquanto não for corrigido: o cofre não pode ser criado, ninguém
-resgata (a `ClaimSheet` mostra "o cofre ainda não está ativo" em vez de um erro
-cru) e as trocas ficam travadas por falta de ciclo completo.
+Corrigido com rebuild (`cargo-build-sbf`) e `solana program deploy` no mesmo
+endereço, pela authority `Au6QSoLYQoSWwxmgdRbpfkPorPf1eM5FTXfsVbZQQXgW`.
+O alerta em `programs/DEPLOY.md § 4` documenta a armadilha e como conferir.
 
-O `lib.rs` do repositório já está com o id correto — falta `build` + `deploy`
-(upgrade) no Playground, com a authority `Au6QSoLYQoSWwxmgdRbpfkPorPf1eM5FTXfsVbZQQXgW`.
-Ver o alerta em `programs/DEPLOY.md § 4`.
+### Estado on-chain (devnet, 2026-07-25)
+
+| | |
+|---|---|
+| Program Id | `HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy` |
+| Cofre (PDA `["treasury"]`) | `57BvNuavWnLQF5wc3DBQsRNeQoNvJAyd13qvxfJ3jF7U` — 2 SOL, teto diário 2 SOL |
+| Authority do cofre | a treasury (`5arzYD6i…`), que assina `pay_weekly_prize` |
+| Keypair da treasury | 5,43 SOL — continua pagando o claim de boas-vindas e o mint das figurinhas |
+
+**A keypair não some com o cofre no ar.** Boas-vindas e figurinhas seguem
+off-chain, e esvaziá-la quebraria as duas coisas — por isso `/api/admin/treasury`
+recusa um `fund` que a deixe abaixo de 0,5 SOL.
+
+Verificado de ponta a ponta na devnet: `claim_daily` pagou 0,0105 SOL, criou o
+`ClaimState` com streak 1, e a segunda tentativa imediata foi recusada com
+`ClaimOnCooldown`. O `GET /api/claim` devolve `onChain: true` para quem tem
+conta e o histórico antigo em `legacy` para quem não tem.
