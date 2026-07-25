@@ -386,7 +386,11 @@ export default function Home() {
         <Onboarding open={tourOpen} onClose={() => setTourOpen(false)} />
 
         {/* Claim diário — streak, resgate e regras */}
-        <ClaimSheet open={claimOpen} onClose={() => setClaimOpen(false)} />
+        <ClaimSheet
+          open={claimOpen}
+          onClose={() => setClaimOpen(false)}
+          onEditarPerfil={() => setProfileOpen(true)}
+        />
 
         {/* Perfil próprio — stats, foto, bio e redes sociais */}
         <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />

@@ -4,6 +4,7 @@
  * Toque no botão de local para centralizar o mapa na obra.
  */
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { X, Image, MapPin, Heart, Trophy, Medal } from 'lucide-react';
 
 const MAX_POSITIONS = 100;
@@ -57,7 +58,7 @@ export default function Leaderboard({ open, onClose, arts = [], onLocate }) {
         )}
 
         {!loading && ranked.length === 0 && (
-          <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro! <Image className="lucide" /></p>
+          <p className="feed-empty">Nenhuma arte registrada ainda. Seja o primeiro!</p>
         )}
 
         <div className="lb-list">
@@ -73,7 +74,17 @@ export default function Leaderboard({ open, onClose, arts = [], onLocate }) {
                 </div>
                 <div className="lb-info">
                   <span className="lb-name">{art.name}</span>
-                  <span className="lb-artist">{art.artistName || 'Anônimo'}</span>
+                  {art.artistWallet ? (
+                    <Link
+                      href={`/perfil/${encodeURIComponent(art.artistWallet)}`}
+                      className="lb-artist lb-artist-link"
+                      onClick={onClose}
+                    >
+                      {art.artistName || 'Anônimo'}
+                    </Link>
+                  ) : (
+                    <span className="lb-artist">{art.artistName || 'Anônimo'}</span>
+                  )}
                 </div>
                 <div className="lb-likes"><Heart className="lucide" fill="currentColor" /> {art.likes}</div>
                 <button

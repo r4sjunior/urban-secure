@@ -14,14 +14,17 @@ import { useMyProfile } from '../../context/ProfileContext';
 import { ARTS_PER_CLAIM, STREAK_TARGET, STREAK_BONUS_MULTIPLIER } from '../../lib/config';
 import { formatCountdown } from '../../lib/social/claim';
 import { sound } from '../../lib/sound';
+import { useWelcome } from '../../lib/hooks/useWelcome';
+import WelcomeCard from './WelcomeCard';
 import StreakTracker from './StreakTracker';
 import ClaimButton from './ClaimButton';
 import ClaimResultModal from './ClaimResultModal';
 
-export default function ClaimSheet({ open, onClose }) {
+export default function ClaimSheet({ open, onClose, onEditarPerfil }) {
   const wallet = useWallet();
   const { status, isLoading, isClaiming, error, lastResult, claim, clearResult, refresh } = useClaim();
   const { refresh: refreshProfile } = useMyProfile();
+  const welcome = useWelcome();
   const [localError, setLocalError] = useState(null);
 
   // Reconsulta ao abrir: o sheet costuma abrir horas depois do último fetch,
@@ -39,6 +42,7 @@ export default function ClaimSheet({ open, onClose }) {
       sound.play('success');
       // As stats do perfil (streak, ranking) mudaram com o claim.
       refreshProfile();
+      welcome.refresh();
     } else {
       sound.play('error');
       setLocalError(result.error || 'Não foi possível resgatar.');
@@ -67,6 +71,16 @@ export default function ClaimSheet({ open, onClose }) {
             <p className="transfer-empty">Carregando seu streak…</p>
           ) : (
             <>
+              {/* Boas-vindas antes de tudo: sem SOL para a primeira arte,
+                  o claim diário fica inalcançável e a trilha do streak não
+                  significa nada para quem está chegando. */}
+              {welcome.mostrar && (
+                <WelcomeCard
+                  welcome={welcome}
+                  onEditarPerfil={() => { onClose(); onEditarPerfil?.(); }}
+                />
+              )}
+
               <StreakTracker
                 currentStreak={status.currentStreak}
                 nextIsClaimable={status.canClaim}
