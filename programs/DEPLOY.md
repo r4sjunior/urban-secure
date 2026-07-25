@@ -106,6 +106,40 @@ build
 Espere `Build successful`. Se der erro, ele aponta a linha — o mais comum é
 o `init-if-needed` do passo 2.
 
+> ### ⚠️ O `declare_id!` precisa bater com o endereço do deploy
+>
+> **Esta é a armadilha que já derrubou este programa uma vez.** O Anchor grava
+> o valor de `declare_id!` dentro do binário e, em TODA instrução, compara com
+> o endereço onde o programa está rodando. Se os dois diferirem, nenhuma
+> instrução funciona — nem as que não usam PDA:
+>
+> ```
+> AnchorError: DeclaredProgramIdMismatch (0x1004)
+> The declared program id does not match the actual program id.
+> ```
+>
+> Foi exatamente o que aconteceu no primeiro deploy: o programa subiu em
+> `HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy` mas com o placeholder
+> `Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS` compilado dentro. O deploy
+> "deu certo", o programa aparece como executável no explorer, e mesmo assim
+> ele recusa tudo.
+>
+> O Playground normalmente sincroniza isso sozinho ao criar o projeto, mas
+> **não** quando você cola um `lib.rs` que já traz um `declare_id!` diferente
+> — que é o caso aqui.
+>
+> **Como acertar:** deploye uma vez, copie o Program Id impresso, cole em
+> `declare_id!(...)` no `lib.rs` do Playground, rode `build` de novo e depois
+> `deploy` (que faz *upgrade* no mesmo endereço, não cria outro programa).
+>
+> **Como conferir antes de depender disso:** rode qualquer instrução. Se vier
+> `0x1004`, o binário no ar está com o id errado — refaça build + deploy.
+>
+> Os três lugares que precisam concordar:
+> - `declare_id!` em `programs/urban_social/src/lib.rs`
+> - `NEXT_PUBLIC_URBAN_PROGRAM_ID` no `.env.local`
+> - `address` em `lib/anchor/urban_social.idl.json`
+
 ### 5. Deploy
 
 ```

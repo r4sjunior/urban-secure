@@ -14,9 +14,15 @@ import nacl from 'tweetnacl';
 import { guardServerConfig } from '../../lib/serverConfig';
 import bs58 from 'bs58';
 import { getLatestPin, getLatestPinStrict, mutatePin, MutationAbort } from '../../lib/pinataStore';
-import { STICKERS, CLAIMS, REGISTRY } from '../../lib/collections';
+import { STICKERS, REGISTRY } from '../../lib/collections';
 import { rateLimit, clientIp } from '../../lib/rateLimit';
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
+// Os pacotes são liberados por `completedCycles`, que passou a viver no
+// programa `urban_social`. Continuar lendo o pin CLAIMS daria o número
+// congelado no dia da migração: quem fechasse um ciclo novo nunca receberia
+// pacote, e quem tinha ciclos antigos receberia pacotes eternamente.
+import { readClaimState } from '../../lib/anchor/onchainClaim';
+import { heliusRpcUrl } from '../../lib/treasury';
 import { buildAlbum, packsAvailable } from '../../lib/stickers/album';
 import { pickArt, albumNumberOf, rollRarity } from '../../lib/stickers/rarity';
 import { mintSticker } from '../../lib/stickers/mintSticker';
@@ -47,7 +53,6 @@ function verifySignature({ wallet, action, target, timestamp, signature }) {
 }
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
-const asMap = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -67,13 +72,13 @@ export default async function handler(req, res) {
     }
 
     try {
-      const [stickers, arts, claims] = await Promise.all([
+      const [stickers, arts, claimState] = await Promise.all([
         getLatestPin(jwt, STICKERS, []),
         getLatestPin(jwt, REGISTRY, []),
-        getLatestPin(jwt, CLAIMS, {}),
+        // Tolerante na leitura de tela: sem chain, o álbum abre e só o
+        // contador de pacotes fica zerado — melhor que a página não abrir.
+        readClaimState(heliusRpcUrl(), wallet).catch(() => null),
       ]);
-
-      const claimState = asMap(claims)[wallet] || null;
       const album = buildAlbum({ wallet, arts: asArray(arts), stickers: asArray(stickers) });
 
       res.setHeader('Cache-Control', 'no-store');
@@ -220,15 +225,18 @@ async function handleOpen({ res, jwt, wallet }) {
   // "nenhum pacote consumido ainda", liberando mints infinitos pagos pela
   // treasury. O registry pode ser tolerante — sem artes, o sorteio recusa
   // sozinho e nada é gasto.
-  const [stickersRaw, artsRaw, claimsRaw] = await Promise.all([
+  //
+  // `readClaimState` já é estrito por construção: falha de RPC lança, em vez
+  // de devolver um estado vazio que aqui significaria "sem ciclos" — o que
+  // recusaria o pacote de quem tem direito, mas nunca liberaria um indevido.
+  const [stickersRaw, artsRaw, claimState] = await Promise.all([
     getLatestPinStrict(jwt, STICKERS, []),
     getLatestPin(jwt, REGISTRY, []),
-    getLatestPinStrict(jwt, CLAIMS, {}),
+    readClaimState(heliusRpcUrl(), wallet),
   ]);
 
   const stickers = asArray(stickersRaw);
   const arts = asArray(artsRaw);
-  const claimState = asMap(claimsRaw)[wallet] || null;
 
   if (packsAvailable({ wallet, claimState, stickers }) <= 0) {
     return res.status(403).json({

@@ -12,6 +12,7 @@ import { fetchJson } from '../lib/fetchJson';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { defaultProfile, normalizeProfile } from '../lib/social/profile';
 import { buildProfileMessage, hashProfileContent } from '../lib/social/profileSignature';
+import { sendSaveProfile } from '../lib/anchor/onchainProfile';
 
 const ProfileContext = createContext(null);
 
@@ -33,6 +34,7 @@ export function ProfileProvider({ children }) {
   const [stats, setStats] = useState(EMPTY_STATS);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnchoring, setIsAnchoring] = useState(false);
   const [error, setError] = useState(null);
 
   // Guarda de corrida: o usuário pode trocar de conta no Phantom enquanto um
@@ -122,14 +124,51 @@ export function ProfileProvider({ children }) {
     }
   }, [address, wallet]);
 
+  /**
+   * Ancora o perfil no contrato — cria a conta on-chain ou atualiza a que já
+   * existe. Ação explícita, e não parte de `saveProfile`, por dois motivos:
+   *
+   *   1. Custa rent (~0.0037 SOL). Cobrar isso de quem só quis trocar a bio
+   *      seria uma cobrança escondida, e o app pede o perfil ANTES de liberar
+   *      o claim de boas-vindas — quem está começando não tem esse saldo.
+   *   2. É irreversível no sentido que importa: a conta passa a existir e a
+   *      leitura passa a preferi-la. Vale ser uma escolha, não um efeito
+   *      colateral de salvar.
+   */
+  const anchorProfile = useCallback(async () => {
+    if (!address) return { ok: false, error: 'Conecte sua carteira.' };
+    if (!profile) return { ok: false, error: 'Preencha seu perfil antes de ancorar.' };
+
+    setIsAnchoring(true);
+    setError(null);
+
+    try {
+      const { signature, created } = await sendSaveProfile(wallet, profile);
+      // Relê para a tela passar a mostrar a versão on-chain — que é a que o
+      // servidor devolverá daqui em diante.
+      await load(address);
+      return { ok: true, signature, created };
+    } catch (err) {
+      const msg = err?.message || 'Não foi possível ancorar o perfil.';
+      setError(msg);
+      return { ok: false, error: msg, pending: !!err?.pending };
+    } finally {
+      setIsAnchoring(false);
+    }
+  }, [address, wallet, profile, load]);
+
   const value = {
     address,
     profile,
     stats,
     isLoading,
     isSaving,
+    isAnchoring,
     error,
     saveProfile,
+    anchorProfile,
+    /** O perfil exibido veio do contrato? Alimenta o selo de "verificado". */
+    isOnChain: !!profile?.onChain,
     refresh: () => load(address),
     /** Perfil "vazio" (nunca salvo) — usado pra sugerir o preenchimento. */
     hasProfile: !!profile?.updatedAt,

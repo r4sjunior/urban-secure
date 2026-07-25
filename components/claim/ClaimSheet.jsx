@@ -22,7 +22,10 @@ import ClaimResultModal from './ClaimResultModal';
 
 export default function ClaimSheet({ open, onClose, onEditarPerfil }) {
   const wallet = useWallet();
-  const { status, isLoading, isClaiming, error, lastResult, claim, clearResult, refresh } = useClaim();
+  const {
+    status, vault, needsArt, legacy,
+    isLoading, isClaiming, error, lastResult, claim, clearResult, refresh,
+  } = useClaim();
   const { refresh: refreshProfile } = useMyProfile();
   const welcome = useWelcome();
   const [localError, setLocalError] = useState(null);
@@ -103,6 +106,25 @@ export default function ClaimSheet({ open, onClose, onEditarPerfil }) {
                 </div>
               )}
 
+              {/* O cofre do contrato ainda não foi criado ou abastecido. Sem
+                  este aviso o usuário só veria a transação falhar, e o erro do
+                  runtime não diz que o problema é nosso, não dele. */}
+              {vault && vault.ready === false && (
+                <div className="claim-warn">
+                  O cofre do projeto ainda não está ativo. Nenhum resgate é possível
+                  até o time ligá-lo — seu streak não corre risco enquanto isso.
+                </div>
+              )}
+
+              {/* Orientação de primeiro resgate, não bloqueio: quem nunca
+                  registrou nada normalmente também não tem SOL pra taxa. */}
+              {needsArt && (
+                <div className="claim-warn">
+                  Registre sua primeira arte antes de resgatar — é ela que dá sentido
+                  ao streak, e o resgate cobre o custo das próximas.
+                </div>
+              )}
+
               {shownError && <div className="err-box">{shownError}</div>}
 
               <ClaimButton
@@ -118,11 +140,23 @@ export default function ClaimSheet({ open, onClose, onEditarPerfil }) {
                   <strong>{STREAK_TARGET} dias seguidos</strong> = resgate dobrado + 1 figurinha
                 </li>
                 <li>Passou <strong>48h</strong> sem resgatar, o streak zera</li>
+                <li>O resgate é uma transação sua — paga a <strong>taxa da rede</strong></li>
               </ul>
 
               {status.longestStreak > 0 && (
                 <p className="fee-note">
                   Seu recorde: {status.longestStreak} dias · {status.totalClaims} resgates
+                </p>
+              )}
+
+              {/* O streak recomeçou do zero na migração para o contrato. Dizer
+                  isso é melhor que deixar o usuário concluir sozinho que
+                  perdemos os dados dele — que continuam registrados. */}
+              {legacy && status.totalClaims === 0 && (
+                <p className="fee-note">
+                  Seu histórico anterior ({legacy.totalClaims} resgates, recorde de{' '}
+                  {legacy.longestStreak} dias) continua guardado. O streak recomeça
+                  do zero agora que ele vive no contrato.
                 </p>
               )}
             </>

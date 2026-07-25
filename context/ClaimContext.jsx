@@ -2,6 +2,15 @@
  * context/ClaimContext.jsx
  * Estado do claim diário da carteira conectada.
  *
+ * O resgate é ON-CHAIN: `claim()` monta a instrução `claim_daily` do programa
+ * `urban_social` e pede a assinatura da carteira. O servidor entrou só na
+ * leitura (`GET /api/claim`), que consulta a conta do programa.
+ *
+ * Consequência que a UI precisa comunicar: o usuário agora paga a taxa de rede
+ * e, no primeiro resgate, o rent da própria conta de estado (~0.0013 SOL).
+ * Quem chega com a carteira zerada passa antes pelo claim de boas-vindas, que
+ * continua off-chain justamente para quebrar esse impasse.
+ *
  * Guarda apenas DADOS — nenhum contador regressivo mora aqui. O countdown é
  * responsabilidade do ClaimButton: um tick de 1s neste contexto
  * re-renderizaria o app inteiro (mapa, feed, dock) uma vez por segundo, o
@@ -11,7 +20,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { buildClaimMessage, claimDay } from '../lib/social/claimSignature';
+import { sendClaimDaily } from '../lib/anchor/onchainClaim';
+import { STREAK_TARGET } from '../lib/config';
 
 const ClaimContext = createContext(null);
 
@@ -40,6 +50,20 @@ export function ClaimProvider({ children }) {
   const [isClaiming, setIsClaiming] = useState(false);
   const [error, setError] = useState(null);
 
+  // Estado do cofre on-chain. Separa dois "não dá pra resgatar" que o usuário
+  // não distingue sozinho: o cooldown DELE não venceu, ou o faucet do dia
+  // acabou pra todo mundo.
+  const [vault, setVault] = useState(null);
+
+  // Orientação de onboarding vinda do servidor — não é mais uma trava, já que
+  // o programa não a implementa. Ver o cabeçalho de pages/api/claim.js.
+  const [needsArt, setNeedsArt] = useState(false);
+
+  // Histórico do claim off-chain anterior à migração. Nunca soma ao streak
+  // atual; existe para a tela poder dizer "seu histórico antigo continua aqui"
+  // em vez de dar a impressão de que os dados sumiram.
+  const [legacy, setLegacy] = useState(null);
+
   // Resultado do último claim bem-sucedido — alimenta o modal de confirmação
   // e, quando fecha um ciclo, o gatilho da abertura de pacote.
   const [lastResult, setLastResult] = useState(null);
@@ -47,6 +71,26 @@ export function ClaimProvider({ children }) {
   // Mesma guarda de corrida do ProfileContext: trocar de conta no Phantom
   // com um fetch no ar faria a resposta antiga sobrescrever o estado novo.
   const requestedFor = useRef(null);
+
+  /**
+   * Busca o estado sem tocar no React — devolve o JSON cru.
+   *
+   * Separado de `load` porque o claim precisa do estado NOVO logo depois de a
+   * transação confirmar, e esperar um `setState` propagar para depois lê-lo do
+   * contexto devolveria o valor velho.
+   */
+  const fetchStatus = useCallback(async (target) => {
+    const res = await fetch(`/api/claim?wallet=${encodeURIComponent(target)}`);
+    const json = await res.json();
+    return { ok: res.ok, json };
+  }, []);
+
+  const applyStatus = useCallback((json) => {
+    setStatus(json.status || EMPTY_STATUS);
+    setVault(json.vault || null);
+    setNeedsArt(!!json.needsArt);
+    setLegacy(json.legacy || null);
+  }, []);
 
   const load = useCallback(async (target) => {
     if (!target) {
@@ -58,11 +102,10 @@ export function ClaimProvider({ children }) {
     setIsLoading(true);
 
     try {
-      const res = await fetch(`/api/claim?wallet=${encodeURIComponent(target)}`);
-      const json = await res.json();
+      const { ok: resOk, json } = await fetchStatus(target);
       if (requestedFor.current !== target) return;
 
-      if (!res.ok) {
+      if (!resOk) {
         // Configuração incompleta no servidor não é falha transitória: o
         // botão vai ficar indisponível para sempre, e esconder o motivo faz
         // o usuário achar que o app está quebrado sem saber o que houve.
@@ -75,7 +118,7 @@ export function ClaimProvider({ children }) {
         throw new Error(json.error || 'Erro ao consultar o claim.');
       }
 
-      setStatus(json.status || EMPTY_STATUS);
+      applyStatus(json);
       setError(null);
     } catch (err) {
       if (requestedFor.current !== target) return;
@@ -87,105 +130,98 @@ export function ClaimProvider({ children }) {
     } finally {
       if (requestedFor.current === target) setIsLoading(false);
     }
-  }, []);
+  }, [fetchStatus, applyStatus]);
 
   useEffect(() => { load(address); }, [address, load]);
 
   /**
-   * Executa o claim: assina a autorização e chama o endpoint.
-   * @returns {{ ok: boolean, error?: string, needsArt?: boolean }}
+   * Executa o claim: monta `claim_daily` e pede a assinatura da carteira.
+   *
+   * Não há mais chamada de escrita ao servidor. Quem valida cooldown, streak,
+   * teto diário e saldo é o programa — e ele o faz na mesma transação que move
+   * o SOL, então não existe estado intermediário para desfazer.
+   *
+   * @returns {{ ok: boolean, error?: string, completedCycle?: boolean }}
    */
   const claim = useCallback(async () => {
     if (!address) return { ok: false, error: 'Conecte sua carteira.' };
-    if (!wallet.signMessage) {
-      return { ok: false, error: 'Esta carteira não suporta assinatura de mensagem.' };
+    if (!wallet.sendTransaction) {
+      return { ok: false, error: 'Esta carteira não suporta envio de transação.' };
     }
 
     setIsClaiming(true);
     setError(null);
 
+    // Quanto ESTE resgate paga, segundo o estado de antes de enviar. Depois da
+    // transação a conta já mostra o próximo valor, e o modal precisa exibir o
+    // que acabou de entrar na carteira.
+    const amountSol = status.amountSol;
+
     try {
-      const timestamp = Date.now();
-      const day = claimDay(timestamp);
-      const message = buildClaimMessage({ wallet: address, day, timestamp });
+      const { signature } = await sendClaimDaily(wallet);
 
-      const sigBytes = await wallet.signMessage(new TextEncoder().encode(message));
-      const signature = Buffer.from(sigBytes).toString('base64');
+      // O estado definitivo vem da chain, não de um retorno nosso: é a única
+      // fonte que não pode discordar do que realmente aconteceu.
+      const { ok: resOk, json } = await fetchStatus(address);
+      const novoStreak = resOk ? (json.status?.currentStreak || 0) : 0;
+      if (resOk) applyStatus(json);
 
-      const res = await fetch('/api/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet: address, timestamp, signature }),
-      });
-      const json = await res.json();
-
-      // O servidor devolve o status atualizado junto com o erro — aproveitar
-      // isso evita um GET extra e mantém o botão coerente com o motivo da
-      // recusa (ex.: cooldown que virou enquanto o usuário assinava).
-      if (json.status) setStatus(json.status);
-
-      if (!res.ok) {
-        setError(json.error || 'Não foi possível resgatar.');
-        return { ok: false, error: json.error, needsArt: !!json.needsArt };
-      }
+      const completedCycle = novoStreak > 0 && novoStreak % STREAK_TARGET === 0;
 
       setLastResult({
-        signature: json.signature,
-        amountSol: json.amountSol,
-        streak: json.streak,
-        completedCycle: json.completedCycle,
-        packAvailable: json.packAvailable,
+        signature,
+        amountSol,
+        streak: novoStreak,
+        completedCycle,
+        // A figurinha é mintada pela feature de pacotes; aqui só sinalizamos
+        // que há um pacote esperando.
+        packAvailable: completedCycle,
       });
 
-      return { ok: true, completedCycle: json.completedCycle };
+      return { ok: true, completedCycle };
     } catch (err) {
-      const raw = err?.message || 'Erro ao resgatar.';
-      const cancelou = /rejected|User rejected|cancel/i.test(raw);
-
-      if (cancelou) {
-        setError('Autorização cancelada.');
-        return { ok: false, error: 'Autorização cancelada.' };
+      // `pending` significa que a transação foi enviada mas o status não
+      // apareceu a tempo — ela ainda pode confirmar. Reler a chain resolve a
+      // ambiguidade: se o cooldown já está fechado, o resgate passou.
+      if (err?.pending) {
+        try {
+          const { ok: resOk, json } = await fetchStatus(address);
+          if (resOk && json.status && !json.status.canClaim) {
+            applyStatus(json);
+            setError(null);
+            setLastResult({
+              signature: err.signature || null,
+              amountSol,
+              streak: json.status.currentStreak,
+              completedCycle: false,
+              packAvailable: false,
+              reconciliado: true,
+            });
+            return { ok: true, reconciliado: true };
+          }
+        } catch { /* a consulta também falhou; cai no erro normal */ }
       }
 
-      // A resposta não chegou — mas o resgate pode ter acontecido.
-      //
-      // O servidor transfere o SOL e grava o estado ANTES de responder. Se a
-      // conexão cair, ou a função exceder o tempo, o dinheiro saiu e o
-      // usuário vê "erro" — foi exatamente o que aconteceu: o claim
-      // contabilizou e a tela acusou falha, exigindo F5.
-      //
-      // Consultar o estado real resolve a ambiguidade: se o cooldown já está
-      // valendo, o resgate deu certo e dizemos isso.
-      try {
-        const res = await fetch(`/api/claim?wallet=${encodeURIComponent(address)}`);
-        const json = await res.json();
-
-        if (res.ok && json.status && !json.status.canClaim) {
-          setStatus(json.status);
-          setError(null);
-          setLastResult({
-            // Sem os detalhes da transação — só sabemos que passou.
-            signature: null,
-            amountSol: json.status.amountSol,
-            streak: json.status.currentStreak,
-            completedCycle: false,
-            packAvailable: false,
-            reconciliado: true,
-          });
-          return { ok: true, reconciliado: true };
-        }
-      } catch { /* a consulta também falhou; segue para o erro normal */ }
-
-      const msg = 'A conexão falhou durante o resgate. Puxe a tela para atualizar e confira seu streak.';
+      // As mensagens já vêm traduzidas de parseProgramError — inclusive as do
+      // próprio programa ("Seu próximo resgate ainda não liberou.").
+      const msg = err?.message || 'Não foi possível resgatar.';
       setError(msg);
+
+      // Recarrega mesmo em caso de erro: a recusa mais comum é cooldown, e o
+      // botão precisa refletir o tempo restante em vez de continuar clicável.
+      load(address);
+
       return { ok: false, error: msg };
     } finally {
       setIsClaiming(false);
     }
-  }, [address, wallet]);
+  }, [address, wallet, status.amountSol, fetchStatus, applyStatus, load]);
 
   const value = {
     status,
+    vault,
+    needsArt,
+    legacy,
     isLoading,
     isClaiming,
     error,

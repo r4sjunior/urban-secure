@@ -30,9 +30,13 @@
 
 use anchor_lang::prelude::*;
 
-// O Solana Playground substitui este id pelo do seu programa ao buildar.
-// Se você deployar por CLI, rode `anchor keys sync` antes.
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+// Id do deploy na devnet, feito em 2026-07-24. É o mesmo valor de
+// NEXT_PUBLIC_URBAN_PROGRAM_ID no .env.local e de `address` no IDL
+// (lib/anchor/urban_social.idl.json) — os três precisam concordar.
+//
+// Ao deployar de novo em outro cluster, rode `anchor keys sync` e atualize os
+// outros dois lugares junto.
+declare_id!("HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy");
 
 // ─────────────────────────────────────────────────────────────────────────
 // Parâmetros do jogo — espelham lib/config.js.

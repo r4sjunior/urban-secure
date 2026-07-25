@@ -6,18 +6,31 @@
  * O POST exige assinatura ed25519 da carteira sobre o CONTEÚDO do perfil
  * (ver lib/social/profileSignature.js) — é o que impede alguém de reescrever
  * o perfil alheio via curl. Mesmo padrão de /api/registry e /api/follow.
+ *
+ * LEITURA HÍBRIDA. Se a carteira ancorou o perfil no programa `urban_social`,
+ * é essa versão que vale: on-chain, só o dono da chave pôde tê-la escrito, o
+ * que é uma garantia mais forte que a nossa verificação de assinatura. Sem
+ * conta on-chain, cai para o pin do Pinata — que é o caso de todo mundo que
+ * criou perfil antes da migração e continua aparecendo normalmente.
+ *
+ * A ESCRITA daqui continua indo só para o Pinata. Ancorar no contrato custa
+ * rent e é uma ação da carteira do usuário, não do servidor
+ * (ver lib/anchor/onchainProfile.js).
  */
 
 import nacl from 'tweetnacl';
 import { guardServerConfig } from '../../lib/serverConfig';
 import bs58 from 'bs58';
 import { getLatestPin, mutatePin } from '../../lib/pinataStore';
-import { PROFILES, REGISTRY, STICKERS, CLAIMS } from '../../lib/collections';
+import { PROFILES, REGISTRY, STICKERS } from '../../lib/collections';
 import { buildProfileMessage, hashProfileContent } from '../../lib/social/profileSignature';
 import {
   normalizeProfile, validateProfile, defaultProfile, SOLANA_ADDR_RE,
 } from '../../lib/social/profile';
 import { computeProfileStats } from '../../lib/social/stats';
+import { readProfile } from '../../lib/anchor/onchainProfile';
+import { readClaimState } from '../../lib/anchor/onchainClaim';
+import { heliusRpcUrl } from '../../lib/treasury';
 
 // Mesma janela de /api/registry: uma assinatura vale por 10 minutos, o que
 // cobre a lentidão de aprovar na carteira sem deixar assinatura antiga
@@ -64,21 +77,30 @@ export default async function handler(req, res) {
     }
 
     try {
-      // As quatro coleções em paralelo — são independentes, e serializar
-      // custaria ~4 round-trips ao gateway do IPFS numa tela que abre muito.
-      const [profiles, arts, stickers, claims] = await Promise.all([
+      const rpcUrl = process.env.HELIUS_API_KEY ? heliusRpcUrl() : null;
+
+      // Tudo em paralelo — são fontes independentes, e serializar custaria
+      // vários round-trips numa tela que abre muito.
+      const [profiles, arts, stickers, onChainProfile, claimState] = await Promise.all([
         getProfiles(jwt),
         getLatestPin(jwt, REGISTRY, []),
         getLatestPin(jwt, STICKERS, []),
-        getLatestPin(jwt, CLAIMS, {}),
+        // Um RPC fora do ar não pode derrubar o perfil inteiro: sem chain, o
+        // pin do Pinata assume e a tela abre igual.
+        rpcUrl ? readProfile(rpcUrl, wallet).catch(() => null) : null,
+        rpcUrl ? readClaimState(rpcUrl, wallet).catch(() => null) : null,
       ]);
 
-      const profile = profiles[wallet] || defaultProfile(wallet);
+      // On-chain vence quando existe (ver o cabeçalho).
+      const profile = onChainProfile || profiles[wallet] || defaultProfile(wallet);
+
       const stats = computeProfileStats({
         wallet,
         arts: Array.isArray(arts) ? arts : [],
         stickers: Array.isArray(stickers) ? stickers : [],
-        claimState: claims?.[wallet] || null,
+        // O streak vive no contrato desde a migração. Ler o pin CLAIMS aqui
+        // mostraria o número antigo e congelado — pior que mostrar zero.
+        claimState,
       });
 
       // Cache curto: o perfil muda pouco, mas as stats mudam a cada arte

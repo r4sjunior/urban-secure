@@ -25,9 +25,11 @@ import nacl from 'tweetnacl';
 import { guardServerConfig } from '../../lib/serverConfig';
 import bs58 from 'bs58';
 import { getLatestPin, mutatePin, MutationAbort } from '../../lib/pinataStore';
-import { TRADES, STICKERS, CLAIMS } from '../../lib/collections';
+import { TRADES, STICKERS } from '../../lib/collections';
 import { rateLimit, clientIp } from '../../lib/rateLimit';
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
+import { readClaimState } from '../../lib/anchor/onchainClaim';
+import { heliusRpcUrl } from '../../lib/treasury';
 import { getVaultAddress, verifyVaultHoldsMint, transferFromVault } from '../../lib/vaultSigner';
 import {
   buildProposeTradeMessage, buildRespondTradeMessage, TRADE_TTL_MS,
@@ -46,7 +48,6 @@ const RATE_LIMIT = 15;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 
 const asArray = (v) => (Array.isArray(v) ? v : []);
-const asMap = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
 function verify(message, wallet, signature) {
   try {
@@ -155,9 +156,13 @@ async function handlePropose({ res, jwt, body, wallet, timestamp }) {
     return res.status(401).json({ error: 'Assinatura inválida — a carteira não autorizou esta proposta.' });
   }
 
-  const [stickersRaw, claimsRaw] = await Promise.all([
+  // O ciclo completo passou a viver no programa `urban_social`; o pin CLAIMS
+  // guarda só o histórico anterior à migração. Leitura estrita de propósito:
+  // esta checagem AUTORIZA uma troca, e falhar aberto liberaria quem não tem
+  // ciclo nenhum.
+  const [stickersRaw, claimState] = await Promise.all([
     getLatestPin(jwt, STICKERS, []),
-    getLatestPin(jwt, CLAIMS, {}),
+    readClaimState(heliusRpcUrl(), wallet),
   ]);
   const stickers = asArray(stickersRaw);
 
@@ -165,8 +170,7 @@ async function handlePropose({ res, jwt, body, wallet, timestamp }) {
   // descartável usada como mula pra concentrar figurinhas — quem quiser
   // fazer isso precisa manter 7 dias de streak em cada conta.
   if (TRADE_REQUIRES_COMPLETED_STREAK) {
-    const claim = asMap(claimsRaw)[wallet];
-    if ((claim?.completedCycles || 0) < 1) {
+    if ((claimState?.completedCycles || 0) < 1) {
       return res.status(403).json({
         error: 'Complete 7 dias seguidos de claim para liberar as trocas.',
       });

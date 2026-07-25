@@ -608,6 +608,11 @@ a.icon-btn, a.feed-toggle { text-decoration: none; }
 .mint-cta:active{transform:scale(.97)}
 .mint-cta:hover{filter:brightness(1.08)}
 .mint-cta:disabled{opacity:.6;cursor:wait}
+/* Variante secundária: ação opcional que não deve competir com o CTA principal
+   da tela (ex.: gravar o perfil no contrato ao lado de "Salvar perfil"). */
+.mint-cta.ghost{background:transparent;border:1px solid var(--accent);color:var(--accent);box-shadow:none;font-size:14px;padding:13px}
+.mint-cta.ghost:hover{background:rgba(45,212,191,.08);filter:none}
+.mint-cta.ghost:disabled{opacity:.45;cursor:not-allowed}
 .fee-note{text-align:center;font-size:11px;color:var(--faint);margin-top:10px}
 
 .ov-backdrop{position:fixed;inset:0;z-index:2000;background:rgba(5,6,8,.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:24px;animation:fade .3s}

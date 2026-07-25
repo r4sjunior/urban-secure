@@ -1,0 +1,194 @@
+{
+  "address": "HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy",
+  "metadata": {
+    "name": "urban_social",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Perfil, claim/streak, treasury e premiacao semanal do Urban Secure Social."
+  },
+  "instructions": [
+    {
+      "name": "init_treasury",
+      "discriminator": [105, 152, 173, 51, 158, 151, 49, 14],
+      "accounts": [
+        { "name": "treasury", "writable": true, "pda": { "seeds": [{ "kind": "const", "value": [116, 114, 101, 97, 115, 117, 114, 121] }] } },
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "daily_budget", "type": "u64" }]
+    },
+    {
+      "name": "fund_treasury",
+      "discriminator": [71, 154, 45, 220, 206, 32, 174, 239],
+      "accounts": [
+        { "name": "treasury", "writable": true },
+        { "name": "funder", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [{ "name": "amount", "type": "u64" }]
+    },
+    {
+      "name": "set_daily_budget",
+      "discriminator": [234, 84, 236, 73, 66, 3, 94, 52],
+      "accounts": [
+        { "name": "treasury", "writable": true },
+        { "name": "authority", "signer": true }
+      ],
+      "args": [{ "name": "daily_budget", "type": "u64" }]
+    },
+    {
+      "name": "init_profile",
+      "discriminator": [210, 162, 212, 95, 95, 186, 89, 119],
+      "accounts": [
+        { "name": "profile", "writable": true },
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "handle", "type": "string" },
+        { "name": "bio", "type": "string" },
+        { "name": "avatar_cid", "type": "string" },
+        { "name": "socials", "type": { "defined": { "name": "Socials" } } }
+      ]
+    },
+    {
+      "name": "update_profile",
+      "discriminator": [98, 67, 99, 206, 86, 115, 175, 1],
+      "accounts": [
+        { "name": "profile", "writable": true },
+        { "name": "owner", "signer": true }
+      ],
+      "args": [
+        { "name": "handle", "type": "string" },
+        { "name": "bio", "type": "string" },
+        { "name": "avatar_cid", "type": "string" },
+        { "name": "socials", "type": { "defined": { "name": "Socials" } } }
+      ]
+    },
+    {
+      "name": "claim_daily",
+      "discriminator": [13, 226, 153, 154, 27, 168, 111, 103],
+      "accounts": [
+        { "name": "claim_state", "writable": true },
+        { "name": "treasury", "writable": true },
+        { "name": "user", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": []
+    },
+    {
+      "name": "pay_weekly_prize",
+      "discriminator": [180, 199, 223, 216, 144, 222, 136, 51],
+      "accounts": [
+        { "name": "payout", "writable": true },
+        { "name": "treasury", "writable": true },
+        { "name": "winner", "writable": true },
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "system_program", "address": "11111111111111111111111111111111" }
+      ],
+      "args": [
+        { "name": "week_id", "type": "u32" },
+        { "name": "position", "type": "u8" },
+        { "name": "amount", "type": "u64" }
+      ]
+    }
+  ],
+  "accounts": [
+    { "name": "Treasury", "discriminator": [238, 239, 123, 238, 89, 1, 168, 253] },
+    { "name": "ClaimState", "discriminator": [71, 73, 19, 83, 53, 228, 242, 53] },
+    { "name": "Profile", "discriminator": [184, 101, 165, 188, 95, 63, 127, 188] },
+    { "name": "WeeklyPayout", "discriminator": [11, 233, 113, 121, 90, 82, 249, 94] }
+  ],
+  "events": [
+    { "name": "ClaimExecuted", "discriminator": [212, 136, 197, 46, 221, 19, 219, 5] },
+    { "name": "TreasuryFunded", "discriminator": [172, 66, 241, 101, 216, 219, 147, 130] },
+    { "name": "PrizePaid", "discriminator": [6, 20, 237, 248, 90, 77, 102, 211] }
+  ],
+  "errors": [
+    { "code": 6000, "name": "ClaimOnCooldown", "msg": "Seu próximo resgate ainda não liberou." },
+    { "code": 6001, "name": "DailyBudgetExhausted", "msg": "O faucet do dia se esgotou. Volte amanhã para manter seu streak." },
+    { "code": 6002, "name": "InsufficientTreasury", "msg": "A carteira do projeto está sem saldo no momento." },
+    { "code": 6003, "name": "InvalidAmount", "msg": "Quantia inválida." },
+    { "code": 6004, "name": "InvalidPosition", "msg": "Posição inválida — o pódio vai de 1 a 3." },
+    { "code": 6005, "name": "Unauthorized", "msg": "Não autorizado." },
+    { "code": 6006, "name": "HandleTooLong", "msg": "O nome deve ter até 24 caracteres." },
+    { "code": 6007, "name": "BioTooLong", "msg": "A bio deve ter até 160 caracteres." },
+    { "code": 6008, "name": "AvatarTooLong", "msg": "Identificador de avatar longo demais." },
+    { "code": 6009, "name": "SocialTooLong", "msg": "Handle de rede social longo demais." },
+    { "code": 6010, "name": "MathOverflow", "msg": "Erro aritmético." }
+  ],
+  "types": [
+    {
+      "name": "Socials",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "instagram", "type": "string" },
+          { "name": "x", "type": "string" },
+          { "name": "tiktok", "type": "string" },
+          { "name": "farcaster", "type": "string" }
+        ]
+      }
+    },
+    {
+      "name": "Treasury",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "pubkey" },
+          { "name": "daily_budget", "type": "u64" },
+          { "name": "daily_spent", "type": "u64" },
+          { "name": "daily_reset_at", "type": "i64" },
+          { "name": "total_distributed", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "ClaimState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "wallet", "type": "pubkey" },
+          { "name": "last_claim_at", "type": "i64" },
+          { "name": "current_streak", "type": "u32" },
+          { "name": "longest_streak", "type": "u32" },
+          { "name": "completed_cycles", "type": "u32" },
+          { "name": "total_claims", "type": "u32" },
+          { "name": "total_claimed", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "Profile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "wallet", "type": "pubkey" },
+          { "name": "handle", "type": "string" },
+          { "name": "bio", "type": "string" },
+          { "name": "avatar_cid", "type": "string" },
+          { "name": "socials", "type": { "defined": { "name": "Socials" } } },
+          { "name": "created_at", "type": "i64" },
+          { "name": "updated_at", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "WeeklyPayout",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "week_id", "type": "u32" },
+          { "name": "position", "type": "u8" },
+          { "name": "winner", "type": "pubkey" },
+          { "name": "amount", "type": "u64" },
+          { "name": "paid_at", "type": "i64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ]
+}

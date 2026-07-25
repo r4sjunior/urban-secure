@@ -21,7 +21,10 @@ import { SocialInputs } from './SocialLinks';
 export default function ProfileSheet({ open, onClose }) {
   const wallet = useWallet();
   const address = wallet.publicKey?.toBase58() || '';
-  const { profile, stats, isLoading, isSaving, saveProfile, refresh } = useMyProfile();
+  const {
+    profile, stats, isLoading, isSaving, isAnchoring, isOnChain,
+    saveProfile, anchorProfile, refresh,
+  } = useMyProfile();
 
   // Rascunho local — o formulário não escreve no contexto até salvar, senão
   // fechar o sheet sem salvar deixaria a UI mostrando dados que não foram
@@ -79,6 +82,24 @@ export default function ProfileSheet({ open, onClose }) {
       sound.play('error');
     }
   }
+
+  async function handleAnchor() {
+    sound.play('click');
+    const result = await anchorProfile();
+
+    if (result.ok) {
+      invalidateProfile(address);
+      setFeedback(result.created ? 'Perfil gravado no contrato!' : 'Perfil atualizado no contrato!');
+      sound.play('success');
+    } else {
+      setFeedback(result.error);
+      sound.play('error');
+    }
+  }
+
+  // Ancorar depois de editar sem salvar gravaria on-chain o texto ANTIGO — o
+  // contexto só conhece o perfil persistido, não o rascunho da tela.
+  const rascunhoPendente = touched.current;
 
   return (
     <div className="sheet open profile-sheet">
@@ -140,6 +161,33 @@ export default function ProfileSheet({ open, onClose }) {
           <p className="fee-note">
             Salvar exige só uma assinatura na carteira — sem transação, sem taxa.
           </p>
+
+          {/* Ancoragem no contrato: opcional, e por isso separada do salvar.
+              Custa rent, então quem está começando (e ainda não recebeu o
+              claim de boas-vindas) não deve ser empurrado para cá. */}
+          <div className="claim-rules" style={{ marginTop: 18 }}>
+            {isOnChain ? (
+              <p className="fee-note">
+                Seu perfil está <strong>gravado no contrato</strong>. Ele vale sobre
+                qualquer cópia off-chain — só sua carteira consegue alterá-lo.
+              </p>
+            ) : (
+              <>
+                <button
+                  className="mint-cta ghost"
+                  onClick={handleAnchor}
+                  disabled={isAnchoring || isSaving || rascunhoPendente}
+                >
+                  {isAnchoring ? 'Gravando no contrato…' : 'Gravar perfil no contrato'}
+                </button>
+                <p className="fee-note">
+                  {rascunhoPendente
+                    ? 'Salve as alterações primeiro — o contrato grava o perfil já salvo.'
+                    : 'Opcional. Uma transação (~0.004 SOL de depósito na conta) para o perfil passar a viver on-chain.'}
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

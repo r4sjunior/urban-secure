@@ -24,7 +24,8 @@ import { guardServerConfig } from '../../lib/serverConfig';
 import { SOLANA_ADDR_RE } from '../../lib/social/profile';
 import { buildWelcomeMessage } from '../../lib/social/welcomeSignature';
 import { emptyClaimState } from '../../lib/social/claim';
-import { getTreasuryBalance, transferFromTreasury } from '../../lib/treasury';
+import { readClaimState } from '../../lib/anchor/onchainClaim';
+import { getTreasuryBalance, transferFromTreasury, heliusRpcUrl } from '../../lib/treasury';
 /**
  * A Vercel corta funções em 10s por padrão. Esta rota espera a confirmação
  * de uma transação na Solana, o que pode passar disso — e o corte acontece
@@ -69,10 +70,20 @@ function cadastroCompleto(profile) {
   return handle.length >= MIN_HANDLE && bio.length >= MIN_BIO;
 }
 
-/** Situação da carteira quanto às boas-vindas. */
-function situacao(claimState, profile) {
+/**
+ * Situação da carteira quanto às boas-vindas.
+ *
+ * `welcomeAt` continua off-chain: as boas-vindas são um pagamento da keypair
+ * do projeto, não do cofre do programa, e existem justamente para quem ainda
+ * não consegue assinar transação nenhuma por falta de saldo.
+ *
+ * Já o "esta carteira usa o claim diário?" precisa vir da CHAIN — depois da
+ * migração, o pin CLAIMS só guarda o histórico anterior, e usá-lo faria todo
+ * usuário novo parecer estreante mesmo depois de resgatar no contrato.
+ */
+function situacao(claimState, profile, onChainClaims = 0) {
   const jaRecebeu = !!claimState?.welcomeAt;
-  const jaClaimou = (claimState?.totalClaims || 0) > 0;
+  const jaClaimou = (claimState?.totalClaims || 0) > 0 || onChainClaims > 0;
   const perfilOk = cadastroCompleto(profile);
 
   return {
@@ -108,12 +119,17 @@ export default async function handler(req, res) {
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
     try {
-      const [claims, profiles] = await Promise.all([
+      const [claims, profiles, onChain] = await Promise.all([
         getLatestPin(jwt, CLAIMS, {}),
         getLatestPin(jwt, PROFILES, {}),
+        // Tolerante na leitura de tela: sem chain, o card aparece e o POST
+        // reconfere antes de pagar qualquer coisa.
+        readClaimState(heliusRpcUrl(), wallet).catch(() => null),
       ]);
       res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json(situacao(asMap(claims)[wallet], asMap(profiles)[wallet]));
+      return res.status(200).json(
+        situacao(asMap(claims)[wallet], asMap(profiles)[wallet], onChain?.totalClaims || 0)
+      );
     } catch (err) {
       console.error('[/api/welcome GET]', err.message);
       return res.status(500).json({ error: 'Erro ao consultar as boas-vindas.' });
@@ -147,14 +163,17 @@ export default async function handler(req, res) {
   try {
     // Leitura ESTRITA: é ela que decide se já pagamos. Um resultado vazio
     // por falha de rede seria lido como "nunca recebeu" e pagaria de novo.
-    const [claims, profiles] = await Promise.all([
+    // A leitura on-chain entra estrita aqui, sem `.catch`: ela decide se
+    // pagamos, e "não consegui ler" não pode virar "nunca claimou".
+    const [claims, profiles, onChain] = await Promise.all([
       getLatestPinStrict(jwt, CLAIMS, {}),
       getLatestPinStrict(jwt, PROFILES, {}),
+      readClaimState(heliusRpcUrl(), wallet),
     ]);
 
     const estado = asMap(claims)[wallet] || emptyClaimState(wallet);
     const perfil = asMap(profiles)[wallet];
-    const s = situacao(estado, perfil);
+    const s = situacao(estado, perfil, onChain?.totalClaims || 0);
 
     if (!s.elegivel) {
       const mensagens = {

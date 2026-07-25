@@ -723,6 +723,74 @@ treasury usa a versão estrita. Leitura que só preenche tela usa a tolerante.
   figurinha desejada digitados. O caminho natural seria navegar pelo álbum de
   outra pessoa e tocar na figurinha — depende de uma tela de álbum público,
   que não existe ainda.
-- **Fase 2 (Anchor)**: o estado de controle (streak, perfil) segue off-chain.
-  Os tipos em `types/social.ts` já estão modelados como contas, então a
-  migração é troca de camada de acesso.
+---
+
+## 10. Fase 2 — integração com o programa `urban_social` ✅ (código) / ⏳ (deploy)
+
+O programa foi escrito, deployado na devnet e **integrado ao app**. A camada de
+acesso não usa `@coral-xyz/anchor`: o cliente oficial arrasta ~500 kB e uma
+versão própria do `@solana/web3.js` que conflita com a 1.98.4 fixada aqui, em
+troca de derivação de PDA, oito bytes de discriminador e Borsh de campos
+escalares — que `lib/anchor/urbanProgram.js` faz em 200 linhas.
+
+| Arquivo | O que é |
+|---|---|
+| `lib/anchor/urban_social.idl.json` | IDL fiel ao `lib.rs` — fonte dos discriminadores |
+| `lib/anchor/urbanProgram.js` | PDAs, codec Borsh, instruções, tradução dos erros |
+| `lib/anchor/rpc.js` | `getAccountInfo` isomórfico (proxy no browser, Helius no servidor) |
+| `lib/anchor/onchainClaim.js` | Leitura do streak + envio do `claim_daily` |
+| `lib/anchor/onchainProfile.js` | Leitura e gravação do perfil |
+| `pages/api/admin/treasury.js` | Cria, abastece e inspeciona o cofre (protegida por `CRON_SECRET`) |
+
+### O que mudou de fato
+
+- **Claim**: o usuário assina a transação; o servidor saiu do caminho.
+  `POST /api/claim` responde **410**. Sumiram a reserva prévia, os dois
+  rollbacks e o log de "transferiu mas não confirmou" — a transação é atômica.
+- **Perfil**: leitura híbrida (conta on-chain vence; sem ela, o pin do Pinata).
+  A gravação on-chain é uma ação explícita (`anchorProfile`), não parte do
+  salvar — criar a conta custa ~0.0037 SOL de rent, **mais** que o claim de
+  boas-vindas paga, e o app pede o perfil ANTES de liberar as boas-vindas.
+  Torná-la obrigatória fecharia o onboarding num impasse.
+- **Premiação**: `pay_weekly_prize` a partir do cofre. A idempotência virou
+  garantia do runtime (`init` no PDA `["payout", semana, posição]`), em vez de
+  depender de conseguir ler o histórico antes de pagar.
+- **Figurinhas e trocas**: `completedCycles` passou a ser lido da chain
+  (`pages/api/stickers.js`, `pages/api/trades.js`). Continuar lendo o pin daria
+  o número congelado no dia da migração.
+
+### O que a migração CUSTOU — e é honesto registrar
+
+A trava **"precisa ter registrado uma arte antes do primeiro claim"** era
+aplicada no servidor, e era a defesa anti-sybil mais eficaz do app. O programa
+não a implementa, e como o servidor não assina mais a transação, não há onde
+impor. Sobrou como orientação na interface (`needsArt`), que quem monta a
+transação na mão ignora. O que limita o prejuízo agora é o teto diário do
+cofre, aplicado on-chain.
+
+Impor isso de novo exigiria um co-signer do servidor em `ClaimDaily` — ou seja,
+um upgrade do programa.
+
+### Streaks: recomeçaram do zero
+
+Decisão tomada em 2026-07-25. O programa não tem instrução de importação, e
+criar uma daria ao operador o poder de escrever qualquer streak — exatamente a
+fraqueza que a migração veio remover. O pin `CLAIMS` **não foi apagado**: segue
+exposto em `legacy` no `GET /api/claim`, só para exibição, e a `ClaimSheet`
+avisa que o histórico continua guardado.
+
+### ⏳ Pendente: o programa no ar precisa de upgrade
+
+O binário deployado em `HyPVy5NLqnqxnxuXH5VgoXAxJM2FRrpf3cTvEPRLcNJy` foi
+compilado com o `declare_id!` **placeholder**, então o Anchor recusa toda
+instrução com `DeclaredProgramIdMismatch` (0x1004). Verificado lendo o ELF da
+conta de programdata: os 32 bytes de `Fg6PaFpo…` estão lá; os de `HyPVy5NL…`
+não.
+
+Consequências enquanto não for corrigido: o cofre não pode ser criado, ninguém
+resgata (a `ClaimSheet` mostra "o cofre ainda não está ativo" em vez de um erro
+cru) e as trocas ficam travadas por falta de ciclo completo.
+
+O `lib.rs` do repositório já está com o id correto — falta `build` + `deploy`
+(upgrade) no Playground, com a authority `Au6QSoLYQoSWwxmgdRbpfkPorPf1eM5FTXfsVbZQQXgW`.
+Ver o alerta em `programs/DEPLOY.md § 4`.

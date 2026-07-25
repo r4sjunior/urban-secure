@@ -6,6 +6,10 @@
  * (lib/config.js). Transferências reais da treasury, com memo, auditáveis
  * na chain.
  *
+ * PAGAMENTO ON-CHAIN. O prêmio sai do cofre do programa `urban_social` pela
+ * instrução `pay_weekly_prize`, assinada pela treasury (que é a authority do
+ * cofre). Não é mais uma transferência simples da keypair.
+ *
  * DUAS PROTEÇÕES QUE NÃO SÃO OPCIONAIS:
  *
  * 1. AUTENTICAÇÃO. Sem o header `Authorization: Bearer $CRON_SECRET`,
@@ -13,46 +17,45 @@
  *    repetindo a chamada. A rota é pública por natureza — a Vercel a invoca
  *    pela internet.
  *
- * 2. IDEMPOTÊNCIA. A Vercel reexecuta cron que falha ou dá timeout. Sem
- *    registro do que já foi pago, um retry pagaria o pódio de novo. O
- *    identificador ISO da semana ("2026-W30") é a chave: existindo payout
- *    pra ela, o cron não faz nada.
+ * 2. IDEMPOTÊNCIA, AGORA GARANTIDA PELO RUNTIME. O programa cria a conta
+ *    ["payout", semana, posição] com `init`: pagar a mesma posição na mesma
+ *    semana uma segunda vez falha porque a conta já existe. Antes isso
+ *    dependia de conseguirmos LER o histórico antes de pagar — e uma leitura
+ *    que falhava era indistinguível de "nunca paguei". A checagem off-chain
+ *    continua aqui, mas como economia de chamadas, não como a defesa.
  */
 
 import { getLatestPin, getLatestPinStrict, mutatePin, MutationAbort } from '../../../lib/pinataStore';
 import { REGISTRY, PROFILES, WEEKLY_PAYOUTS } from '../../../lib/collections';
-import { previousWeek, rankArtists } from '../../../lib/social/weekly';
+import { previousWeek, rankArtists, weekIdToU32 } from '../../../lib/social/weekly';
 import { displayName } from '../../../lib/social/profile';
-import { getTreasuryBalance, transferFromTreasury } from '../../../lib/treasury';
+import { heliusRpcUrl, getTreasuryAddress, sendFromTreasury } from '../../../lib/treasury';
+import { payWeeklyPrizeIx, treasuryPda, decodeTreasury } from '../../../lib/anchor/urbanProgram';
+import { fetchAccount } from '../../../lib/anchor/rpc';
+import { guardOperatorSecret } from '../../../lib/serverAuth';
 import {
   WEEKLY_PRIZE_SPLIT, weeklyPrizeLamports,
   TREASURY_RESERVE_SOL, LAMPORTS_PER_SOL,
 } from '../../../lib/config';
 
-/** Comparação em tempo constante — evita que a diferença de tempo entre um
- *  segredo errado no primeiro caractere e no último vaze o valor. */
-function safeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+/**
+ * "Já existe" vindo do runtime não é falha — é a idempotência funcionando.
+ *
+ * Quando o cron reexecuta uma semana já paga, o `init` do PDA de comprovante
+ * falha com "already in use". Tratar isso como erro encheria o log de alarme
+ * falso e faria a rota devolver 500 para o comportamento correto.
+ */
+function jaPago(err) {
+  const texto = `${err?.message || ''}\n${Array.isArray(err?.logs) ? err.logs.join('\n') : ''}`;
+  return /already in use|custom program error: 0x0\b/i.test(texto);
 }
 
 export default async function handler(req, res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    // Falha fechado: sem segredo configurado, ninguém paga nada. O contrário
-    // seria uma rota de pagamento aberta por esquecimento de env var.
-    console.error('[cron/weekly-payout] CRON_SECRET ausente — premiação desativada.');
-    return res.status(500).json({ error: 'Cron não configurado.' });
-  }
-
-  const auth = req.headers.authorization || '';
-  if (!safeEqual(auth, `Bearer ${secret}`)) {
-    return res.status(401).json({ error: 'Não autorizado.' });
-  }
+  // Falha fechado: sem segredo configurado, ninguém paga nada. O contrário
+  // seria uma rota de pagamento aberta por esquecimento de env var.
+  if (guardOperatorSecret(req, res, 'cron/weekly-payout')) return;
 
   const jwt = process.env.PINATA_JWT;
   if (!jwt) return res.status(500).json({ error: 'Servidor não configurado.' });
@@ -88,7 +91,15 @@ export default async function handler(req, res) {
     const podium = ranking.slice(0, WEEKLY_PRIZE_SPLIT.length);
     const totalLamports = podium.reduce((sum, _, i) => sum + weeklyPrizeLamports(i), 0);
 
-    const balance = await getTreasuryBalance();
+    // O saldo que importa agora é o do COFRE, não o da keypair: é dele que o
+    // programa tira o prêmio. A keypair só paga a taxa da transação.
+    const vaultAccount = await fetchAccount(heliusRpcUrl(), treasuryPda());
+    if (!vaultAccount || !decodeTreasury(vaultAccount.data)) {
+      console.error('[cron/weekly-payout] cofre on-chain não inicializado');
+      return res.status(503).json({ error: 'Cofre on-chain não inicializado.', week: week.id });
+    }
+
+    const balance = vaultAccount.lamports;
     const reserve = Math.round(TREASURY_RESERVE_SOL * LAMPORTS_PER_SOL);
     if (balance - totalLamports < 0) {
       // Não paga pela metade: um pódio parcialmente premiado é pior que um
@@ -107,6 +118,8 @@ export default async function handler(req, res) {
 
     const profileMap = profiles && typeof profiles === 'object' ? profiles : {};
     const winners = [];
+    const authority = getTreasuryAddress();
+    const weekU32 = weekIdToU32(week.id);
 
     // Sequencial, não em paralelo: transações da mesma carteira em paralelo
     // disputam o mesmo blockhash e algumas falham por duplicidade. São no
@@ -116,22 +129,36 @@ export default async function handler(req, res) {
       const lamports = weeklyPrizeLamports(i);
       if (lamports <= 0) continue;
 
+      const position = i + 1;
+
       try {
-        const signature = await transferFromTreasury({
-          toWallet: entry.wallet,
-          lamports,
-          memo: `urban-premio ${week.id} #${i + 1}`,
+        const signature = await sendFromTreasury({
+          instructions: [payWeeklyPrizeIx({
+            authority,
+            winner: entry.wallet,
+            weekId: weekU32,
+            position,
+            amount: lamports,
+          })],
+          memo: `urban-premio ${week.id} #${position}`,
         });
 
         winners.push({
           wallet: entry.wallet,
           handle: displayName(profileMap[entry.wallet], entry.wallet),
-          position: i + 1,
+          position,
           artsCount: entry.artsCount,
           lamports,
           signature,
         });
       } catch (err) {
+        if (jaPago(err)) {
+          // O comprovante on-chain já existe: esta posição foi paga numa
+          // execução anterior que não chegou a gravar o histórico. Seguir em
+          // frente é o certo — repetir só falharia de novo.
+          console.warn('[cron/weekly-payout] posição já paga on-chain', week.id, position);
+          continue;
+        }
         // Um pagamento falhando não impede os outros — quem ficou em 2º não
         // deve perder o prêmio porque a carteira do 1º deu problema. O
         // registro guarda só quem realmente recebeu.
